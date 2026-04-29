@@ -1,0 +1,58 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" fill="#070D18"/>
+  <path d="M0 545L960 462M76 0L226 640M760 0L936 640" stroke="#12345E" stroke-width="2" opacity=".65"/>
+  <rect x="34" y="30" width="892" height="580" fill="#0C101B" stroke="#6CE0FF" stroke-width="2"/>
+  <rect x="48" y="44" width="864" height="552" fill="#151A2A" stroke="#2F80ED"/>
+  <rect x="48" y="44" width="170" height="4" fill="#6CE0FF"/>
+  <rect x="48" y="44" width="6" height="70" fill="#6CE0FF"/>
+  <rect x="736" y="592" width="176" height="4" fill="#2F80ED"/>
+  <rect x="906" y="504" width="6" height="92" fill="#2F80ED"/>
+
+  <text x="78" y="86" fill="#8EEAFF" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">HUNTER LICENSE</text>
+  <text x="76" y="156" fill="#F4F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="800">렘모냥</text>
+
+  <rect x="660" y="78" width="208" height="36" fill="#20263A" stroke="#3B4568"/>
+  <text x="680" y="101" fill="#8D93B8" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">OWNER</text>
+  <text x="746" y="101" fill="#F4F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="800">lemona</text>
+
+  <rect x="660" y="128" width="208" height="36" fill="#111827" stroke="#2A3554"/>
+  <text x="680" y="151" fill="#8D93B8" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">STATUS</text>
+  <text x="752" y="151" fill="#72E39A" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="800">ACTIVE</text>
+
+  <rect x="76" y="232" width="808" height="108" fill="#0F1422" stroke="#2E3858"/>
+  <rect x="76" y="232" width="808" height="4" fill="#192033"/>
+  <text x="100" y="270" fill="#8EEAFF" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="800">VITAL SIGN</text>
+  <text x="100" y="312" fill="#F4F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="800">HP 9 / 9</text>
+  <rect x="278" y="289" width="452" height="24" fill="#252C43" stroke="#596282"/>
+  <rect x="278" y="289" width="452" height="24" fill="#72E39A"/>
+  <g stroke="#101523" stroke-width="2">
+    <path d="M323 289V313"/><path d="M368 289V313"/><path d="M413 289V313"/><path d="M458 289V313"/>
+    <path d="M503 289V313"/><path d="M548 289V313"/><path d="M593 289V313"/><path d="M638 289V313"/><path d="M683 289V313"/>
+  </g>
+  <text x="770" y="310" fill="#72E39A" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800">100%</text>
+
+  <text x="76" y="392" fill="#8EEAFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="800">PHYSICAL</text>
+  <rect x="76" y="408" width="382" height="154" fill="#0F1422" stroke="#303B5D"/>
+  <path d="M94 474H440" stroke="#273251"/>
+  <text x="100" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">STAT</text>
+  <text x="280" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">VALUE</text>
+  <text x="370" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">MOD</text>
+  <g font-family="Segoe UI, Arial, sans-serif" font-weight="800">
+    <rect x="96" y="486" width="60" height="25" fill="#20263A" stroke="#55607E"/><text x="110" y="505" fill="#EAF0FF" font-size="15">STR</text><text x="172" y="505" fill="#F4F7FF" font-size="19">근력</text><text x="294" y="505" fill="#FFD166" font-size="25">6</text><text x="380" y="505" fill="#FF6B81" font-size="21">-1</text>
+    <rect x="96" y="522" width="60" height="25" fill="#20263A" stroke="#55607E"/><text x="110" y="541" fill="#EAF0FF" font-size="15">DEX</text><text x="172" y="541" fill="#F4F7FF" font-size="19">민첩</text><text x="294" y="541" fill="#FFD166" font-size="25">1</text><text x="380" y="541" fill="#FF6B81" font-size="21">-4</text>
+  </g>
+
+  <text x="502" y="392" fill="#8EEAFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="800">MENTAL</text>
+  <rect x="502" y="408" width="382" height="154" fill="#0F1422" stroke="#303B5D"/>
+  <path d="M520 474H866" stroke="#273251"/>
+  <text x="526" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">STAT</text>
+  <text x="706" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">VALUE</text>
+  <text x="796" y="456" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800">MOD</text>
+  <g font-family="Segoe UI, Arial, sans-serif" font-weight="800">
+    <rect x="522" y="486" width="60" height="25" fill="#20263A" stroke="#55607E"/><text x="538" y="505" fill="#EAF0FF" font-size="15">INT</text><text x="598" y="505" fill="#F4F7FF" font-size="19">지능</text><text x="720" y="505" fill="#FFD166" font-size="25">2</text><text x="806" y="505" fill="#FF6B81" font-size="21">-3</text>
+    <rect x="522" y="522" width="60" height="25" fill="#20263A" stroke="#55607E"/><text x="538" y="541" fill="#EAF0FF" font-size="15">WIS</text><text x="598" y="541" fill="#F4F7FF" font-size="19">지혜</text><text x="720" y="541" fill="#FFD166" font-size="25">1</text><text x="806" y="541" fill="#FF6B81" font-size="21">-4</text>
+  </g>
+
+  <rect x="76" y="574" width="808" height="24" fill="#101523" stroke="#25304D"/>
+  <text x="96" y="592" fill="#7D86A8" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">PANDORA NETWORK / CLASSIFIED HUNTER RECORD</text>
+</svg>

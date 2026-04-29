@@ -3,6 +3,10 @@
 Discord 기반 TRPG 운영 자동화 봇입니다.  
 캐릭터 등록, 선택, 조회, 상태창 이미지 출력, 관리자용 캐릭터 대시보드를 통해 어반 판타지 커뮤니티 운영 흐름을 자동화하는 것을 목표로 합니다.
 
+## Preview
+
+![Hunter status card preview](docs/status-card-preview.svg)
+
 ## 프로젝트 구성
 
 ```text
@@ -105,3 +109,7 @@ Discord Bot Token이 외부에 노출된 적이 있다면 Discord Developer Port
 ## 개발 현황
 
 현재 캐릭터 관리 기반 기능이 구현되어 있으며, 다음 단계는 `/판정` 명령어와 판정 로그 시스템입니다.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
