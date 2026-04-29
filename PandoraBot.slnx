@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PandoraBot/PandoraBot.csproj" />
+  <Project Path="PandoraAdmin/PandoraAdmin.csproj" />
+</Solution>

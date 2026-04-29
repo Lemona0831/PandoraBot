@@ -1,0 +1,34 @@
+# Build output
+bin/
+obj/
+artifacts/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# Local runtime settings and secrets
+PandoraBot/BotSettings.json
+PandoraBot/Credental.json
+**/BotSettings.json
+**/Credental.json
+**/*credential*.json
+**/*Credential*.json
+**/*secret*.json
+**/*Secret*.json
+
+# Environment files
+.env
+.env.*
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
