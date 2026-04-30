@@ -18,8 +18,9 @@ namespace PandoraBot.Modules
             {
                 var result = await GoogleSheetService.Instance.RegisterAsync(sourceSheet, Context.User.Id.ToString());
                 var action = result.WasUpdated ? "갱신" : "등록";
+                var reviewNote = result.WasUpdated ? "" : "\n신규 캐릭터는 진행자 승인 후 선택할 수 있습니다.";
 
-                await FollowupAsync($"{Context.User.Mention}님의 캐릭터 `{result.Hunter.CharacterName}` 정보를 {action}했습니다. (row {result.RowNumber})");
+                await FollowupAsync($"{Context.User.Mention}님의 캐릭터 `{result.Hunter.CharacterName}` 정보를 {action}했습니다. (row {result.RowNumber}){reviewNote}");
             }
             catch (Exception ex)
             {
@@ -86,6 +87,20 @@ namespace PandoraBot.Modules
                 var diceTotal = die1 + die2;
                 var total = diceTotal + stat.Modifier;
                 var outcome = ResolveOutcome(total);
+
+                await GoogleSheetService.Instance.AppendJudgementLogAsync(new GoogleSheetService.JudgementLogEntry(
+                    Context.Guild?.Id.ToString() ?? "",
+                    Context.Channel.Id.ToString(),
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    hunter.CharacterName,
+                    stat.Code,
+                    stat.KoreanName,
+                    die1,
+                    die2,
+                    stat.Modifier,
+                    total,
+                    outcome.Label));
 
                 var embed = new EmbedBuilder()
                     .WithTitle("PROJECT:PANDORA | 판정 결과")
@@ -168,7 +183,7 @@ namespace PandoraBot.Modules
                 foreach (var character in characters)
                 {
                     var marker = character.IsSelected ? "*" : " ";
-                    builder.AppendLine($"{marker} {character.CharacterName}  HP {character.CurrentHp}/{character.MaxHp}  row:{character.RowNumber}");
+                    builder.AppendLine($"{marker} {character.CharacterName}  HP {character.CurrentHp}/{character.MaxHp}  status:{character.ReviewStatus}  row:{character.RowNumber}");
                 }
 
                 builder.AppendLine("--------------------------------");
@@ -250,15 +265,15 @@ namespace PandoraBot.Modules
         {
             if (total >= 10)
             {
-                return new JudgementOutcome("**성공** - 의도한 행동을 안정적으로 해냅니다.", Color.Green);
+                return new JudgementOutcome("성공", "**성공** - 의도한 행동을 안정적으로 해냅니다.", Color.Green);
             }
 
             if (total >= 7)
             {
-                return new JudgementOutcome("**부분 성공** - 성공하지만 대가, 선택, 위험이 따라붙습니다.", Color.Gold);
+                return new JudgementOutcome("부분 성공", "**부분 성공** - 성공하지만 대가, 선택, 위험이 따라붙습니다.", Color.Gold);
             }
 
-            return new JudgementOutcome("**실패** - 진행자가 실패에 따른 상황 변화를 제시합니다.", Color.Red);
+            return new JudgementOutcome("실패", "**실패** - 진행자가 실패에 따른 상황 변화를 제시합니다.", Color.Red);
         }
 
         private static string FormatModifier(int modifier)
@@ -268,6 +283,6 @@ namespace PandoraBot.Modules
 
         private sealed record StatInfo(string Code, string KoreanName, int Value, int Modifier);
 
-        private sealed record JudgementOutcome(string Text, Color Color);
+        private sealed record JudgementOutcome(string Label, string Text, Color Color);
     }
 }
