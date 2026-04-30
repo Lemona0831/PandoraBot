@@ -17,22 +17,22 @@ namespace PandoraBot.Modules
                 var characters = await GoogleSheetService.Instance.ListCharactersAsync(Context.User.Id.ToString());
                 if (characters.Count == 0)
                 {
-                    await FollowupAsync("등록된 캐릭터가 없습니다. 먼저 `/등록`을 사용해주세요.", ephemeral: true);
-                    return;
+                    throw new Exception("등록된 캐릭터가 없습니다. 우선 '/등록'을 사용해주세요.");
                 }
 
                 var embed = new EmbedBuilder()
-                    .WithTitle("PROJECT:PANDORA | 검수 상태")
+                    .WithTitle("[System:PANDORA] 검수 상태")
                     .WithColor(new Color(86, 190, 255))
-                    .WithDescription($"{Context.User.Mention} 님의 등록 캐릭터 검수 현황입니다.")
+                    .WithDescription($"{Context.User.Mention} 님의 캐릭터 등록 현황.")
                     .WithFooter("pending: 검수 대기 / approved: 승인 / rejected: 반려")
                     .WithCurrentTimestamp();
 
                 foreach (var character in characters)
                 {
+                    var reviewText = FormatReviewStatus(character.ReviewStatus);
                     embed.AddField(
                         character.CharacterName,
-                        $"상태: `{character.ReviewStatus}`\nHP: `{character.CurrentHp} / {character.MaxHp}`",
+                        $"상태: `{reviewText}`\nHP: `{character.CurrentHp} / {character.MaxHp}`",
                         inline: false);
                 }
 
@@ -40,7 +40,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ex.Message, ephemeral: true);
             }
         }
 
@@ -54,15 +54,14 @@ namespace PandoraBot.Modules
                 var characters = await GoogleSheetService.Instance.ListCharactersAsync(Context.User.Id.ToString());
                 if (characters.Count == 0)
                 {
-                    await FollowupAsync("등록된 캐릭터가 없습니다. 먼저 `/등록`을 사용해주세요.", ephemeral: true);
-                    return;
+                    throw new Exception("등록된 캐릭터가 없습니다. 우선 '/등록'을 사용해주세요.");
                 }
 
                 var selected = characters.FirstOrDefault(character => character.IsSelected);
                 var recentLogs = await GoogleSheetService.Instance.ListRecentJudgementLogsForUserAsync(Context.User.Id.ToString(), 3);
 
                 var embed = new EmbedBuilder()
-                    .WithTitle("PROJECT:PANDORA | 내 정보")
+                    .WithTitle("[System:PANDORA] 내 정보")
                     .WithColor(new Color(60, 190, 255))
                     .WithDescription(Context.User.Mention)
                     .WithCurrentTimestamp();
@@ -75,7 +74,7 @@ namespace PandoraBot.Modules
                 {
                     embed.AddField(
                         "현재 선택",
-                        $"**{selected.CharacterName}**\nHP `{selected.CurrentHp} / {selected.MaxHp}`\n검수 `{selected.ReviewStatus}`",
+                        $"**{selected.CharacterName}**\nHP `{selected.CurrentHp} / {selected.MaxHp}`\n검수 `{FormatReviewStatus(selected.ReviewStatus)}`",
                         inline: false);
                 }
 
@@ -83,7 +82,7 @@ namespace PandoraBot.Modules
                     .Select(character =>
                     {
                         var marker = character.IsSelected ? "선택" : "대기";
-                        return $"`{marker}` {character.CharacterName} | HP {character.CurrentHp}/{character.MaxHp} | {character.ReviewStatus}";
+                        return $"`{marker}` {character.CharacterName} | HP {character.CurrentHp}/{character.MaxHp} | {FormatReviewStatus(character.ReviewStatus)}";
                     });
 
                 embed.AddField("보유 캐릭터", string.Join("\n", statusLines), inline: false);
@@ -107,8 +106,19 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ex.Message, ephemeral: true);
             }
+        }
+
+        private static string FormatReviewStatus(string reviewStatus)
+        {
+            return reviewStatus switch
+            {
+                "pending" => "검수 대기",
+                "approved" => "검수 완료",
+                "rejected" => "검수 반려",
+                _ => reviewStatus
+            };
         }
     }
 }

@@ -7,6 +7,7 @@ using System.Text;
 namespace PandoraBot.Modules
 {
 
+    [DefaultMemberPermissions(GuildPermission.ManageGuild)]
     public class AdminModule : InteractionModuleBase<SocketInteractionContext>
     {
         [SlashCommand("관리목록", "관리자용: 등록된 캐릭터 목록을 조회합니다.")]
