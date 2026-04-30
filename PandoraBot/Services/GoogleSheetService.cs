@@ -15,6 +15,7 @@ namespace PandoraBot.Services
         private const string JudgementLogSheet = "\uD310\uC815 \uB85C\uADF8";
         private const string AdminLogSheet = "\uAD00\uB9AC \uB85C\uADF8";
         private const string NoticeLogSheet = "\uACF5\uC9C0 \uB85C\uADF8";
+        private const string SelectionSheet = "\uC120\uD0DD \uC0C1\uD0DC";
         private const string SelectedMarker = "selected";
         private const string ReviewPending = "pending";
         private const string ReviewApproved = "approved";
@@ -103,11 +104,8 @@ namespace PandoraBot.Services
 
                 EnsureCharacterApproved(selectedRow);
 
-                foreach (var row in rows.Where(row => row.UserId == userId))
-                {
-                    var marker = row.RowNumber == selectedRow.RowNumber ? SelectedMarker : "";
-                    await UpdateSingleCellAsync($"K{row.RowNumber}", marker);
-                }
+                await UpsertSelectionRowAsync(userId, selectedRow.CharacterName);
+                await ClearLegacySelectionMarkersAsync(rows, userId);
 
                 return selectedRow.ToHunter();
             }
@@ -131,9 +129,15 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
-                var selectedRow = rows.FirstOrDefault(row =>
-                    row.UserId == userId &&
-                    string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase));
+                var selections = await ReadSelectionRowsAsync();
+                var selection = selections.FirstOrDefault(row => row.UserId == userId);
+                var selectedRow = selection == null
+                    ? rows.FirstOrDefault(row =>
+                        row.UserId == userId &&
+                        string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase))
+                    : rows.FirstOrDefault(row =>
+                        row.UserId == userId &&
+                        Normalize(row.CharacterName) == Normalize(selection.CharacterName));
 
                 if (selectedRow == null)
                 {
@@ -189,18 +193,27 @@ namespace PandoraBot.Services
 
             try
             {
+                await EnsureOperationalSheetsAsync();
+
                 var rows = await ReadStorageRowsAsync();
+                var selections = await ReadSelectionRowsAsync();
+                var selectionRows = selections.Where(row => row.UserId == userId).ToList();
                 var userRows = rows.Where(row => row.UserId == userId).ToList();
                 var selectedRows = userRows
                     .Where(row => string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase))
                     .ToList();
+
+                foreach (var selection in selectionRows)
+                {
+                    await ClearSelectionRowAsync(selection.RowNumber);
+                }
 
                 foreach (var row in selectedRows)
                 {
                     await UpdateSingleCellAsync($"K{row.RowNumber}", "");
                 }
 
-                return new ClearSelectionResult(selectedRows.Count);
+                return new ClearSelectionResult(selectionRows.Count + selectedRows.Count);
             }
             finally
             {
@@ -247,6 +260,7 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
+                var selectedCharacterName = await GetSelectedCharacterNameForUserAsync(userId);
                 return rows
                     .Where(row => row.UserId == userId)
                     .OrderBy(row => row.CharacterName)
@@ -254,7 +268,7 @@ namespace PandoraBot.Services
                         row.CharacterName,
                         row.CurrentHp,
                         row.MaxHp,
-                        string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase),
+                        IsSelected(row, selectedCharacterName),
                         row.RowNumber,
                         NormalizeReviewStatus(row.ReviewStatus)))
                     .ToList();
@@ -274,6 +288,7 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
+                var selections = await ReadSelectionRowsAsync();
                 return rows
                     .OrderBy(row => row.UserId)
                     .ThenBy(row => row.CharacterName)
@@ -283,9 +298,10 @@ namespace PandoraBot.Services
                         row.CharacterName,
                         row.CurrentHp,
                         row.MaxHp,
-                        string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase),
+                        IsSelected(row, selections),
                         row.RowNumber,
-                        NormalizeReviewStatus(row.ReviewStatus)))
+                        NormalizeReviewStatus(row.ReviewStatus),
+                        GetSelectedBy(row, selections)))
                     .ToList();
             }
             finally
@@ -376,17 +392,23 @@ namespace PandoraBot.Services
 
                 var rows = await ReadStorageRowsAsync();
                 var row = FindCharacterRow(rows, characterName);
-                var userRows = rows.Where(item => item.UserId == row.UserId).ToList();
-                var selectedRows = userRows
-                    .Where(item => string.Equals(item.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase))
+                var selections = await ReadSelectionRowsAsync();
+                var selectionRows = selections.Where(item => item.UserId == row.UserId).ToList();
+                var selectedRows = rows
+                    .Where(item => item.UserId == row.UserId && string.Equals(item.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase))
                     .ToList();
+
+                foreach (var selectionRow in selectionRows)
+                {
+                    await ClearSelectionRowAsync(selectionRow.RowNumber);
+                }
 
                 foreach (var selectedRow in selectedRows)
                 {
                     await UpdateSingleCellAsync($"K{selectedRow.RowNumber}", "");
                 }
 
-                return new ClearSelectionResult(selectedRows.Count);
+                return new ClearSelectionResult(selectionRows.Count + selectedRows.Count);
             }
             finally
             {
@@ -461,6 +483,7 @@ namespace PandoraBot.Services
 
                 var normalizedStatus = NormalizeReviewStatus(status);
                 var rows = await ReadStorageRowsAsync();
+                var selections = await ReadSelectionRowsAsync();
                 return rows
                     .Where(row => NormalizeReviewStatus(row.ReviewStatus) == normalizedStatus)
                     .OrderBy(row => row.UserId)
@@ -471,9 +494,10 @@ namespace PandoraBot.Services
                         row.CharacterName,
                         row.CurrentHp,
                         row.MaxHp,
-                        string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase),
+                        IsSelected(row, selections),
                         row.RowNumber,
-                        NormalizeReviewStatus(row.ReviewStatus)))
+                        NormalizeReviewStatus(row.ReviewStatus),
+                        GetSelectedBy(row, selections)))
                     .ToList();
             }
             finally
@@ -688,6 +712,95 @@ namespace PandoraBot.Services
             return rows;
         }
 
+        private async Task<List<SelectionRow>> ReadSelectionRowsAsync()
+        {
+            var selectionSheetName = ToRangeSheetName(SelectionSheet);
+            var response = await service.Spreadsheets.Values.Get(storageSpreadsheetId, $"{selectionSheetName}!A2:D").ExecuteAsync();
+            var values = response.Values ?? new List<IList<object>>();
+            var rows = new List<SelectionRow>();
+
+            for (var index = 0; index < values.Count; index++)
+            {
+                var row = values[index];
+                var userId = GetString(row, 0);
+                var characterName = GetString(row, 1);
+
+                if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(characterName))
+                {
+                    continue;
+                }
+
+                rows.Add(new SelectionRow(
+                    RowNumber: index + 2,
+                    UserId: userId,
+                    CharacterName: characterName,
+                    SelectedAt: GetString(row, 2)));
+            }
+
+            return rows;
+        }
+
+        private async Task<string?> GetSelectedCharacterNameForUserAsync(string userId)
+        {
+            var selections = await ReadSelectionRowsAsync();
+            var selection = selections.FirstOrDefault(row => row.UserId == userId);
+            return selection?.CharacterName;
+        }
+
+        private async Task UpsertSelectionRowAsync(string userId, string characterName)
+        {
+            var selections = await ReadSelectionRowsAsync();
+            var rowNumber = selections.FirstOrDefault(row => row.UserId == userId)?.RowNumber ?? await GetNextSelectionRowAsync();
+            var valueRange = new ValueRange
+            {
+                Values = new List<IList<object>>
+                {
+                    new List<object>
+                    {
+                        userId,
+                        characterName,
+                        DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        ""
+                    }
+                }
+            };
+
+            var request = service.Spreadsheets.Values.Update(valueRange, storageSpreadsheetId, $"{ToRangeSheetName(SelectionSheet)}!A{rowNumber}:D{rowNumber}");
+            request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW;
+            await request.ExecuteAsync();
+        }
+
+        private async Task<int> GetNextSelectionRowAsync()
+        {
+            var response = await service.Spreadsheets.Values.Get(storageSpreadsheetId, $"{ToRangeSheetName(SelectionSheet)}!A:B").ExecuteAsync();
+            var values = response.Values ?? new List<IList<object>>();
+
+            for (var i = values.Count - 1; i >= 0; i--)
+            {
+                var row = values[i];
+                if (!string.IsNullOrWhiteSpace(GetString(row, 0)) || !string.IsNullOrWhiteSpace(GetString(row, 1)))
+                {
+                    return i + 2;
+                }
+            }
+
+            return 2;
+        }
+
+        private async Task ClearSelectionRowAsync(int rowNumber)
+        {
+            var clearRequest = service.Spreadsheets.Values.Clear(new ClearValuesRequest(), storageSpreadsheetId, $"{ToRangeSheetName(SelectionSheet)}!A{rowNumber}:D{rowNumber}");
+            await clearRequest.ExecuteAsync();
+        }
+
+        private async Task ClearLegacySelectionMarkersAsync(IReadOnlyList<StorageRow> rows, string userId)
+        {
+            foreach (var row in rows.Where(row => row.UserId == userId && !string.IsNullOrWhiteSpace(row.Selected)))
+            {
+                await UpdateSingleCellAsync($"K{row.RowNumber}", "");
+            }
+        }
+
         private async Task<int> GetNextStorageRowAsync()
         {
             var storageSheetName = ToRangeSheetName(StorageSheet);
@@ -763,7 +876,7 @@ namespace PandoraBot.Services
                 .ToHashSet(StringComparer.Ordinal);
 
             var addRequests = new List<Request>();
-            foreach (var sheetName in new[] { JudgementLogSheet, AdminLogSheet, NoticeLogSheet })
+            foreach (var sheetName in new[] { JudgementLogSheet, AdminLogSheet, NoticeLogSheet, SelectionSheet })
             {
                 if (!existingSheets.Contains(sheetName))
                 {
@@ -794,6 +907,10 @@ namespace PandoraBot.Services
             await WriteHeaderRowAsync(NoticeLogSheet, "A1:G1", new List<object>
             {
                 "시각", "종류", "제목", "내용", "관리자ID", "관리자명", "채널ID"
+            });
+            await WriteHeaderRowAsync(SelectionSheet, "A1:D1", new List<object>
+            {
+                "유저ID", "선택캐릭터", "선택시각", "비고"
             });
 
             operationalSheetsChecked = true;
@@ -899,6 +1016,40 @@ namespace PandoraBot.Services
             return value.Trim().ToUpperInvariant();
         }
 
+        private static bool IsSelected(StorageRow row, string? selectedCharacterName)
+        {
+            if (!string.IsNullOrWhiteSpace(selectedCharacterName))
+            {
+                return Normalize(row.CharacterName) == Normalize(selectedCharacterName);
+            }
+
+            return string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSelected(StorageRow row, IReadOnlyList<SelectionRow> selections)
+        {
+            return selections.Any(selection =>
+                selection.UserId == row.UserId &&
+                Normalize(selection.CharacterName) == Normalize(row.CharacterName)) ||
+                string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetSelectedBy(StorageRow row, IReadOnlyList<SelectionRow> selections)
+        {
+            var selection = selections.FirstOrDefault(selection =>
+                selection.UserId == row.UserId &&
+                Normalize(selection.CharacterName) == Normalize(row.CharacterName));
+
+            if (selection != null)
+            {
+                return selection.UserId;
+            }
+
+            return string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase)
+                ? row.UserId
+                : "";
+        }
+
         private static StorageRow FindOwnedCharacterRow(IReadOnlyList<StorageRow> rows, string userId, string characterName)
         {
             var requestedName = Normalize(characterName);
@@ -979,7 +1130,7 @@ namespace PandoraBot.Services
 
         public sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
 
-        public sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
+        public sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus, string SelectedByUserId);
 
         public sealed record UpdateHpResult(string CharacterName, string UserId, int OldHp, int CurrentHp, int MaxHp, int RowNumber);
 
@@ -1002,6 +1153,8 @@ namespace PandoraBot.Services
         public sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
 
         private sealed record SheetReference(string SpreadsheetId, string SheetName);
+
+        private sealed record SelectionRow(int RowNumber, string UserId, string CharacterName, string SelectedAt);
 
         private sealed record StorageRow(
             int RowNumber,

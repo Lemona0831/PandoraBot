@@ -24,22 +24,7 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                var builder = new StringBuilder();
-                builder.AppendLine("```text");
-                builder.AppendLine("PANDORA ADMIN / CHARACTER LIST");
-                builder.AppendLine("--------------------------------");
-
-                foreach (var character in characters)
-                {
-                    var selected = character.IsSelected ? "*" : " ";
-                    builder.AppendLine($"{selected} row:{character.RowNumber} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp} status:{character.ReviewStatus}");
-                }
-
-                builder.AppendLine("--------------------------------");
-                builder.AppendLine("* = selected");
-                builder.Append("```");
-
-                await FollowupAsync(builder.ToString(), ephemeral: true);
+                await FollowupAsync(embed: BuildCharacterListEmbed(characters, "PANDORA ADMIN | 캐릭터 목록"), ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -201,18 +186,7 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                var builder = new StringBuilder();
-                builder.AppendLine("```text");
-                builder.AppendLine($"PANDORA ADMIN / REVIEW {status}");
-                builder.AppendLine("--------------------------------");
-
-                foreach (var character in characters)
-                {
-                    builder.AppendLine($"row:{character.RowNumber} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp}");
-                }
-
-                builder.Append("```");
-                await FollowupAsync(builder.ToString(), ephemeral: true);
+                await FollowupAsync(embed: BuildCharacterListEmbed(characters, $"PANDORA ADMIN | 검수 목록: {status}"), ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -258,18 +232,38 @@ namespace PandoraBot.Modules
         public async Task SendNotice(
             [Summary("종류", "세션, 모집, 점검, 안내 등")] string noticeType,
             [Summary("제목", "공지 제목")] string title,
-            [Summary("내용", "공지 내용")] string content)
+            [Summary("내용", "공지 내용")] string content,
+            [Summary("역할멘션", "선택 사항: 함께 호출할 역할")] IRole? role = null,
+            [Summary("유저멘션", "선택 사항: 함께 호출할 유저")] IUser? user = null,
+            [Summary("전체멘션", "True면 @everyone을 함께 호출합니다.")] bool everyone = false)
         {
             await DeferAsync();
 
             try
             {
+                var mentions = new List<string>();
+                if (everyone)
+                {
+                    mentions.Add("@everyone");
+                }
+
+                if (role != null)
+                {
+                    mentions.Add(role.Mention);
+                }
+
+                if (user != null)
+                {
+                    mentions.Add(user.Mention);
+                }
+
                 var embed = new EmbedBuilder()
                     .WithTitle($"PROJECT:PANDORA | {title}")
                     .WithColor(new Color(60, 190, 255))
                     .WithDescription(content)
                     .AddField("분류", noticeType, inline: true)
                     .AddField("작성", Context.User.Mention, inline: true)
+                    .AddField("호출", mentions.Count == 0 ? "없음" : string.Join(" ", mentions), inline: false)
                     .WithFooter("PANDORA NETWORK / OPERATOR NOTICE")
                     .WithCurrentTimestamp()
                     .Build();
@@ -277,12 +271,13 @@ namespace PandoraBot.Modules
                 await GoogleSheetService.Instance.AppendNoticeLogAsync(
                     noticeType,
                     title,
-                    content,
+                    $"{content}\nMENTION: {(mentions.Count == 0 ? "none" : string.Join(" ", mentions))}",
                     Context.User.Id.ToString(),
                     Context.User.Username,
                     Context.Channel.Id.ToString());
 
-                await FollowupAsync(embed: embed);
+                var mentionText = mentions.Count == 0 ? null : string.Join(" ", mentions);
+                await FollowupAsync(mentionText, embed: embed);
             }
             catch (Exception ex)
             {
@@ -356,6 +351,38 @@ namespace PandoraBot.Modules
                 .AddField("Mental", $"INT {hunter.Intelligence} ({FormatModifier(hunter.GetModifier(hunter.Intelligence))})\nWIS {hunter.Wisdom} ({FormatModifier(hunter.GetModifier(hunter.Wisdom))})\nCHA {hunter.Charisma} ({FormatModifier(hunter.GetModifier(hunter.Charisma))})", inline: true)
                 .WithCurrentTimestamp()
                 .Build();
+        }
+
+        private static Embed BuildCharacterListEmbed(IReadOnlyList<GoogleSheetService.AdminCharacterSummary> characters, string title)
+        {
+            var embed = new EmbedBuilder()
+                .WithTitle(title)
+                .WithColor(new Color(70, 160, 255))
+                .WithDescription($"총 {characters.Count}개의 캐릭터를 표시합니다.")
+                .WithFooter("선택 상태는 별도 선택 상태 시트 기준입니다.")
+                .WithCurrentTimestamp();
+
+            foreach (var character in characters.Take(20))
+            {
+                var selectedText = character.IsSelected
+                    ? $"선택 중: <@{character.SelectedByUserId}>"
+                    : "선택 안 됨";
+                var ownerText = string.IsNullOrWhiteSpace(character.UserId)
+                    ? "소유자 미확인"
+                    : $"소유자: <@{character.UserId}>";
+
+                embed.AddField(
+                    $"{character.CharacterName} | HP {character.CurrentHp}/{character.MaxHp}",
+                    $"{ownerText}\n검수: `{character.ReviewStatus}`\n{selectedText}\nrow: `{character.RowNumber}`",
+                    inline: false);
+            }
+
+            if (characters.Count > 20)
+            {
+                embed.AddField("표시 제한", "Discord Embed 가독성을 위해 최대 20개까지만 표시했습니다. `/관리목록 개수:20`처럼 나누어 확인해주세요.", inline: false);
+            }
+
+            return embed.Build();
         }
 
         private static string FormatModifier(int modifier)
