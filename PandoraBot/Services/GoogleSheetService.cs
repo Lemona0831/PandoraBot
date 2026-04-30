@@ -241,6 +241,89 @@ namespace PandoraBot.Services
             }
         }
 
+        public async Task<IReadOnlyList<AdminCharacterSummary>> ListAllCharactersAsync(int limit = 25)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                var rows = await ReadStorageRowsAsync();
+                return rows
+                    .OrderBy(row => row.UserId)
+                    .ThenBy(row => row.CharacterName)
+                    .Take(Math.Clamp(limit, 1, 50))
+                    .Select(row => new AdminCharacterSummary(
+                        row.UserId,
+                        row.CharacterName,
+                        row.CurrentHp,
+                        row.MaxHp,
+                        string.Equals(row.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase),
+                        row.RowNumber))
+                    .ToList();
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        public async Task<Hunter> GetCharacterForAdminAsync(string userId, string characterName)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                var rows = await ReadStorageRowsAsync();
+                return FindOwnedCharacterRow(rows, userId, characterName).ToHunter();
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        public async Task<UpdateHpResult> SetCharacterHpAsync(string userId, string characterName, int currentHp)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                var rows = await ReadStorageRowsAsync();
+                var row = FindOwnedCharacterRow(rows, userId, characterName);
+                var clampedHp = Math.Clamp(currentHp, 0, row.MaxHp);
+
+                await UpdateSingleCellAsync($"J{row.RowNumber}", clampedHp.ToString());
+                return new UpdateHpResult(row.CharacterName, row.UserId, clampedHp, row.MaxHp, row.RowNumber);
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        public async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string userId)
+        {
+            return await ClearSelectedCharacterAsync(userId);
+        }
+
+        public async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string userId, string characterName)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                var rows = await ReadStorageRowsAsync();
+                var row = FindOwnedCharacterRow(rows, userId, characterName);
+
+                await ClearStorageRowAsync(row.RowNumber);
+                return new DeleteCharacterResult(row.CharacterName, row.RowNumber);
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
         private async Task<Hunter> LoadHunterFromSourceAsync(SheetReference source, string userId)
         {
             var sourceSheetName = ToRangeSheetName(source.SheetName);
@@ -473,6 +556,21 @@ namespace PandoraBot.Services
             return value.Trim().ToUpperInvariant();
         }
 
+        private static StorageRow FindOwnedCharacterRow(IReadOnlyList<StorageRow> rows, string userId, string characterName)
+        {
+            var requestedName = Normalize(characterName);
+            var row = rows.FirstOrDefault(row =>
+                row.UserId == userId &&
+                Normalize(row.CharacterName) == requestedName);
+
+            if (row == null)
+            {
+                throw new Exception("No registered character was found for that Discord user ID and character name.");
+            }
+
+            return row;
+        }
+
         private static int? ExtractGid(string input)
         {
             var match = Regex.Match(input, @"[?#&]gid=(\d+)", RegexOptions.IgnoreCase);
@@ -491,6 +589,10 @@ namespace PandoraBot.Services
         public sealed record DeleteCharacterResult(string CharacterName, int RowNumber);
 
         public sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber);
+
+        public sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber);
+
+        public sealed record UpdateHpResult(string CharacterName, string UserId, int CurrentHp, int MaxHp, int RowNumber);
 
         private sealed record SheetReference(string SpreadsheetId, string SheetName);
 
