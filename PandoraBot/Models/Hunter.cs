@@ -26,9 +26,16 @@ namespace PandoraBot.Models
         // 예를 들어 (특성치 - 10) / 2 같은 공식이 있다면 여기에 넣으면 됩니다.
         public int GetModifier(int statValue)
         {
-            // 현재 시트 이미지에는 6일 때 -1, 1일 때 -3 등으로 표시되어 있네요.
-            // 필요하신 공식이 있다면 여기에 구현하면 Modules에서 편하게 불러씁니다.
-            return (statValue / 2) - 4; // 예시 공식 (시트 값에 맞춰 조정 필요)
+            return statValue switch
+            {
+                >= 18 => 3,
+                >= 16 => 2,
+                >= 13 => 1,
+                >= 9 => 0,
+                >= 6 => -1,
+                >= 4 => -2,
+                _ => -3
+            };
         }
     }
 }
