@@ -320,7 +320,16 @@ namespace PandoraBot.Modules
                     .WithCurrentTimestamp()
                     .Build();
 
-                await Context.Channel.SendMessageAsync(embed: publicEmbed);
+                try
+                {
+                    await FollowupAsync(embed: publicEmbed);
+                }
+                catch (Exception notifyEx)
+                {
+                    await FollowupAsync(
+                        $"처리는 완료됐지만 공개 알림 전송에 실패했습니다: {notifyEx.Message}",
+                        ephemeral: true);
+                }
             }
             catch (Exception ex)
             {
