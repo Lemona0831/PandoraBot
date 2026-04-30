@@ -567,6 +567,37 @@ namespace PandoraBot.Services
             }
         }
 
+        public async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsForUserAsync(string userId, int limit = 10)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var sheetName = ToRangeSheetName(JudgementLogSheet);
+                var response = await service.Spreadsheets.Values.Get(storageSpreadsheetId, $"{sheetName}!A2:M").ExecuteAsync();
+                var values = response.Values ?? new List<IList<object>>();
+
+                return values
+                    .Where(row => GetString(row, 3) == userId)
+                    .Reverse()
+                    .Take(Math.Clamp(limit, 1, 30))
+                    .Select(row => new JudgementLogSummary(
+                        GetString(row, 0),
+                        GetString(row, 4),
+                        GetString(row, 5),
+                        GetString(row, 6),
+                        GetString(row, 11),
+                        GetString(row, 12)))
+                    .ToList();
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
         public async Task AppendNoticeLogAsync(string noticeType, string title, string content, string adminUserId, string adminUsername, string channelId)
         {
             await SheetLock.WaitAsync();

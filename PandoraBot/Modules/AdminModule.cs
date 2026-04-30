@@ -309,6 +309,18 @@ namespace PandoraBot.Modules
                 await FollowupAsync(
                     $"`{result.CharacterName}` {label} 처리: HP `{result.OldHp} -> {result.CurrentHp} / {result.MaxHp}` (row {result.RowNumber})",
                     ephemeral: true);
+
+                var publicEmbed = new EmbedBuilder()
+                    .WithTitle($"PROJECT:PANDORA | {label} 알림")
+                    .WithColor(action == "heal" ? Color.Green : Color.Red)
+                    .WithDescription($"<@{result.UserId}> 님의 **{result.CharacterName}** 상태가 변경되었습니다.")
+                    .AddField("HP", $"`{result.OldHp} -> {result.CurrentHp} / {result.MaxHp}`", inline: true)
+                    .AddField("처리", label, inline: true)
+                    .WithFooter("PANDORA NETWORK / STATUS UPDATE")
+                    .WithCurrentTimestamp()
+                    .Build();
+
+                await Context.Channel.SendMessageAsync(embed: publicEmbed);
             }
             catch (Exception ex)
             {
