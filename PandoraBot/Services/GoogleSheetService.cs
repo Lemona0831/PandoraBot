@@ -294,14 +294,14 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetCharacterForAdminAsync(string userId, string characterName)
+        public async Task<Hunter> GetCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
             try
             {
                 var rows = await ReadStorageRowsAsync();
-                return FindOwnedCharacterRow(rows, userId, characterName).ToHunter();
+                return FindCharacterRow(rows, characterName).ToHunter();
             }
             finally
             {
@@ -309,7 +309,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<UpdateHpResult> SetCharacterHpAsync(string userId, string characterName, int currentHp)
+        public async Task<UpdateHpResult> SetCharacterHpAsync(string characterName, int currentHp)
         {
             await SheetLock.WaitAsync();
 
@@ -318,7 +318,7 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
-                var row = FindOwnedCharacterRow(rows, userId, characterName);
+                var row = FindCharacterRow(rows, characterName);
                 var clampedHp = Math.Clamp(currentHp, 0, row.MaxHp);
 
                 await UpdateSingleCellAsync($"J{row.RowNumber}", clampedHp.ToString());
@@ -331,7 +331,6 @@ namespace PandoraBot.Services
         }
 
         public async Task<UpdateHpResult> AdjustCharacterHpAsync(
-            string userId,
             string characterName,
             int amount,
             string adminUserId,
@@ -346,7 +345,7 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
-                var row = FindOwnedCharacterRow(rows, userId, characterName);
+                var row = FindCharacterRow(rows, characterName);
                 var signedAmount = action == "heal" ? amount : -amount;
                 var newHp = Math.Clamp(row.CurrentHp + signedAmount, 0, row.MaxHp);
 
@@ -367,12 +366,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string userId)
-        {
-            return await ClearSelectedCharacterAsync(userId);
-        }
-
-        public async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string userId, string characterName)
+        public async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -381,7 +375,35 @@ namespace PandoraBot.Services
                 await EnsureOperationalSheetsAsync();
 
                 var rows = await ReadStorageRowsAsync();
-                var row = FindOwnedCharacterRow(rows, userId, characterName);
+                var row = FindCharacterRow(rows, characterName);
+                var userRows = rows.Where(item => item.UserId == row.UserId).ToList();
+                var selectedRows = userRows
+                    .Where(item => string.Equals(item.Selected, SelectedMarker, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                foreach (var selectedRow in selectedRows)
+                {
+                    await UpdateSingleCellAsync($"K{selectedRow.RowNumber}", "");
+                }
+
+                return new ClearSelectionResult(selectedRows.Count);
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        public async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string characterName)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var rows = await ReadStorageRowsAsync();
+                var row = FindCharacterRow(rows, characterName);
 
                 await ClearStorageRowAsync(row.RowNumber);
                 return new DeleteCharacterResult(row.CharacterName, row.RowNumber);
@@ -393,7 +415,6 @@ namespace PandoraBot.Services
         }
 
         public async Task<ReviewResult> SetCharacterReviewStatusAsync(
-            string userId,
             string characterName,
             string status,
             string adminUserId,
@@ -413,7 +434,7 @@ namespace PandoraBot.Services
                 }
 
                 var rows = await ReadStorageRowsAsync();
-                var row = FindOwnedCharacterRow(rows, userId, characterName);
+                var row = FindCharacterRow(rows, characterName);
 
                 await UpdateSingleCellAsync($"L{row.RowNumber}", normalizedStatus);
                 if (normalizedStatus == ReviewRejected)
@@ -891,6 +912,26 @@ namespace PandoraBot.Services
             }
 
             return row;
+        }
+
+        private static StorageRow FindCharacterRow(IReadOnlyList<StorageRow> rows, string characterName)
+        {
+            var requestedName = Normalize(characterName);
+            var matches = rows
+                .Where(row => Normalize(row.CharacterName) == requestedName)
+                .ToList();
+
+            if (matches.Count == 0)
+            {
+                throw new Exception("No registered character was found with that name.");
+            }
+
+            if (matches.Count > 1)
+            {
+                throw new Exception("Multiple characters were found with that name. Please clean up duplicate character names first.");
+            }
+
+            return matches[0];
         }
 
         private static void EnsureCharacterApproved(StorageRow row)

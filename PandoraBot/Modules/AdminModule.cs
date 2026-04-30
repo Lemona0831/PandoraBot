@@ -6,6 +6,7 @@ using System.Text;
 
 namespace PandoraBot.Modules
 {
+
     public class AdminModule : InteractionModuleBase<SocketInteractionContext>
     {
         [SlashCommand("관리목록", "관리자용: 등록된 캐릭터 목록을 조회합니다.")]
@@ -31,7 +32,7 @@ namespace PandoraBot.Modules
                 foreach (var character in characters)
                 {
                     var selected = character.IsSelected ? "*" : " ";
-                    builder.AppendLine($"{selected} row:{character.RowNumber} user:{character.UserId} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp} status:{character.ReviewStatus}");
+                    builder.AppendLine($"{selected} row:{character.RowNumber} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp} status:{character.ReviewStatus}");
                 }
 
                 builder.AppendLine("--------------------------------");
@@ -48,14 +49,13 @@ namespace PandoraBot.Modules
 
         [SlashCommand("관리정보", "관리자용: 특정 캐릭터 정보를 조회합니다.")]
         public async Task ShowCharacterForAdmin(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName)
         {
             await DeferAsync(ephemeral: true);
 
             try
             {
-                var hunter = await GoogleSheetService.Instance.GetCharacterForAdminAsync(userId, characterName);
+                var hunter = await GoogleSheetService.Instance.GetCharacterForAdminAsync(characterName);
                 await FollowupAsync(embed: BuildHunterEmbed(hunter), ephemeral: true);
             }
             catch (Exception ex)
@@ -66,7 +66,6 @@ namespace PandoraBot.Modules
 
         [SlashCommand("관리체력", "관리자용: 특정 캐릭터의 현재 HP를 설정합니다.")]
         public async Task SetCharacterHp(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("현재HP", "변경할 현재 HP")] int currentHp)
         {
@@ -74,12 +73,12 @@ namespace PandoraBot.Modules
 
             try
             {
-                var result = await GoogleSheetService.Instance.SetCharacterHpAsync(userId, characterName, currentHp);
+                var result = await GoogleSheetService.Instance.SetCharacterHpAsync(characterName, currentHp);
                 await GoogleSheetService.Instance.AppendAdminLogAsync(
                     "HP설정",
                     Context.User.Id.ToString(),
                     Context.User.Username,
-                    userId,
+                    result.UserId,
                     result.CharacterName,
                     $"{result.OldHp} -> {result.CurrentHp}");
 
@@ -95,42 +94,40 @@ namespace PandoraBot.Modules
 
         [SlashCommand("피해", "관리자용: 특정 캐릭터에게 피해를 적용합니다.")]
         public async Task DamageCharacter(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("수치", "적용할 피해량")] int amount,
             [Summary("메모", "선택 사항: 피해 사유")] string? memo = null)
         {
-            await AdjustHpAsync(userId, characterName, amount, "damage", memo);
+            await AdjustHpAsync(characterName, amount, "damage", memo);
         }
 
         [SlashCommand("회복", "관리자용: 특정 캐릭터를 회복합니다.")]
         public async Task HealCharacter(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("수치", "적용할 회복량")] int amount,
             [Summary("메모", "선택 사항: 회복 사유")] string? memo = null)
         {
-            await AdjustHpAsync(userId, characterName, amount, "heal", memo);
+            await AdjustHpAsync(characterName, amount, "heal", memo);
         }
 
-        [SlashCommand("관리선택해제", "관리자용: 특정 유저의 선택 캐릭터를 해제합니다.")]
+        [SlashCommand("관리선택해제", "관리자용: 특정 캐릭터 소유자의 선택 상태를 해제합니다.")]
         public async Task ClearUserSelection(
-            [Summary("유저ID", "Discord User ID")] string userId)
+            [Summary("캐릭터", "캐릭터 이름")] string characterName)
         {
             await DeferAsync(ephemeral: true);
 
             try
             {
-                var result = await GoogleSheetService.Instance.ClearSelectedCharacterForAdminAsync(userId);
+                var result = await GoogleSheetService.Instance.ClearSelectedCharacterForAdminAsync(characterName);
                 await GoogleSheetService.Instance.AppendAdminLogAsync(
                     "선택해제",
                     Context.User.Id.ToString(),
                     Context.User.Username,
-                    userId,
                     "",
+                    characterName,
                     $"{result.ClearedCount} row(s) cleared");
 
-                await FollowupAsync($"선택 상태 {result.ClearedCount}개를 해제했습니다.", ephemeral: true);
+                await FollowupAsync($"`{characterName}` 소유자의 선택 상태 {result.ClearedCount}개를 해제했습니다.", ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -138,9 +135,8 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("관리삭제", "관리자용: 특정 유저의 캐릭터를 삭제합니다.")]
+        [SlashCommand("관리삭제", "관리자용: 특정 캐릭터를 삭제합니다.")]
         public async Task DeleteCharacterForAdmin(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("확인", "True로 설정하면 캐릭터를 삭제합니다.")] bool confirm = false)
         {
@@ -151,17 +147,17 @@ namespace PandoraBot.Modules
                 if (!confirm)
                 {
                     await FollowupAsync(
-                        $"`{characterName}` 삭제를 진행하려면 `/관리삭제 유저ID:{userId} 캐릭터:{characterName} 확인:True`로 다시 실행해주세요.",
+                        $"`{characterName}` 삭제를 진행하려면 `/관리삭제 캐릭터:{characterName} 확인:True`로 다시 실행해주세요.",
                         ephemeral: true);
                     return;
                 }
 
-                var result = await GoogleSheetService.Instance.DeleteCharacterForAdminAsync(userId, characterName);
+                var result = await GoogleSheetService.Instance.DeleteCharacterForAdminAsync(characterName);
                 await GoogleSheetService.Instance.AppendAdminLogAsync(
                     "삭제",
                     Context.User.Id.ToString(),
                     Context.User.Username,
-                    userId,
+                    "",
                     result.CharacterName,
                     $"row {result.RowNumber}");
 
@@ -175,20 +171,18 @@ namespace PandoraBot.Modules
 
         [SlashCommand("관리승인", "관리자용: 캐릭터를 승인합니다.")]
         public async Task ApproveCharacter(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("메모", "선택 사항: 검수 메모")] string? memo = null)
         {
-            await SetReviewStatusAsync(userId, characterName, "approved", memo);
+            await SetReviewStatusAsync(characterName, "approved", memo);
         }
 
         [SlashCommand("관리반려", "관리자용: 캐릭터를 반려합니다.")]
         public async Task RejectCharacter(
-            [Summary("유저ID", "Discord User ID")] string userId,
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("메모", "선택 사항: 반려 사유")] string? memo = null)
         {
-            await SetReviewStatusAsync(userId, characterName, "rejected", memo);
+            await SetReviewStatusAsync(characterName, "rejected", memo);
         }
 
         [SlashCommand("관리검수목록", "관리자용: 검수 상태별 캐릭터 목록을 조회합니다.")]
@@ -214,7 +208,7 @@ namespace PandoraBot.Modules
 
                 foreach (var character in characters)
                 {
-                    builder.AppendLine($"row:{character.RowNumber} user:{character.UserId} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp}");
+                    builder.AppendLine($"row:{character.RowNumber} / {character.CharacterName} HP {character.CurrentHp}/{character.MaxHp}");
                 }
 
                 builder.Append("```");
@@ -296,7 +290,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        private async Task AdjustHpAsync(string userId, string characterName, int amount, string action, string? memo)
+        private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
         {
             await DeferAsync(ephemeral: true);
 
@@ -309,7 +303,6 @@ namespace PandoraBot.Modules
                 }
 
                 var result = await GoogleSheetService.Instance.AdjustCharacterHpAsync(
-                    userId,
                     characterName,
                     amount,
                     Context.User.Id.ToString(),
@@ -328,14 +321,13 @@ namespace PandoraBot.Modules
             }
         }
 
-        private async Task SetReviewStatusAsync(string userId, string characterName, string status, string? memo)
+        private async Task SetReviewStatusAsync(string characterName, string status, string? memo)
         {
             await DeferAsync(ephemeral: true);
 
             try
             {
                 var result = await GoogleSheetService.Instance.SetCharacterReviewStatusAsync(
-                    userId,
                     characterName,
                     status,
                     Context.User.Id.ToString(),
