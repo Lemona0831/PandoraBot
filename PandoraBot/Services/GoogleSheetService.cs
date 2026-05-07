@@ -65,7 +65,7 @@ namespace PandoraBot.Services
                 }
 
                 var hunter = await LoadHunterFromSourceAsync(source, userId);
-                var result = await UpsertStorageAsync(hunter);
+                var result = await UpsertStorageAsync(hunter, source);
                 return result;
             }
             catch (Exception ex)
@@ -665,6 +665,9 @@ namespace PandoraBot.Services
                 throw new Exception("Required character data is missing from the source sheet.");
             }
 
+            var maxHp = ParseInt(hpData, 5, "Max HP");
+            var currentHp = Math.Clamp(ParseInt(hpData, 0, "Current HP"), 0, Math.Max(maxHp, 0));
+
             return new Hunter
             {
                 UserId = userId,
@@ -675,12 +678,12 @@ namespace PandoraBot.Services
                 Intelligence = ParseInt(statData, 9, "Intelligence"),
                 Wisdom = ParseInt(statData, 12, "Wisdom"),
                 Charisma = ParseInt(statData, 15, "Charisma"),
-                CurrentHp = ParseInt(hpData, 0, "Current HP"),
-                MaxHp = ParseInt(hpData, 5, "Max HP")
+                CurrentHp = currentHp,
+                MaxHp = maxHp
             };
         }
 
-        private async Task<RegistrationResult> UpsertStorageAsync(Hunter hunter)
+        private async Task<RegistrationResult> UpsertStorageAsync(Hunter hunter, SheetReference source)
         {
             var rows = await ReadStorageRowsAsync();
             var matches = rows
@@ -695,7 +698,7 @@ namespace PandoraBot.Services
             var reviewStatus = matches.FirstOrDefault(row => !string.IsNullOrWhiteSpace(row.ReviewStatus))?.ReviewStatus
                 ?? (wasUpdated ? "" : ReviewPending);
 
-            await WriteStorageRowAsync(rowNumber, hunter, selected, reviewStatus);
+            await WriteStorageRowAsync(rowNumber, hunter, selected, reviewStatus, source);
 
             foreach (var duplicate in matches.Skip(1))
             {
@@ -709,7 +712,7 @@ namespace PandoraBot.Services
         private async Task<List<StorageRow>> ReadStorageRowsAsync()
         {
             var storageSheetName = ToRangeSheetName(StorageSheet);
-            var response = await service.Spreadsheets.Values.Get(storageSpreadsheetId, $"{storageSheetName}!A2:L").ExecuteAsync();
+            var response = await service.Spreadsheets.Values.Get(storageSpreadsheetId, $"{storageSheetName}!A2:N").ExecuteAsync();
             var values = response.Values ?? new List<IList<object>>();
             var rows = new List<StorageRow>();
 
@@ -735,9 +738,11 @@ namespace PandoraBot.Services
                     Wisdom: ParseOptionalInt(row, 6),
                     Charisma: ParseOptionalInt(row, 7),
                     MaxHp: ParseOptionalInt(row, 8),
-                    CurrentHp: ParseOptionalInt(row, 9),
+                    CurrentHp: ClampHp(ParseOptionalInt(row, 9), ParseOptionalInt(row, 8)),
                     Selected: GetString(row, 10),
-                    ReviewStatus: GetString(row, 11)));
+                    ReviewStatus: GetString(row, 11),
+                    SourceSpreadsheetId: GetString(row, 12),
+                    SourceSheetName: GetString(row, 13)));
             }
 
             return rows;
@@ -850,7 +855,7 @@ namespace PandoraBot.Services
             return 2;
         }
 
-        private async Task WriteStorageRowAsync(int rowNumber, Hunter hunter, string selected, string reviewStatus)
+        private async Task WriteStorageRowAsync(int rowNumber, Hunter hunter, string selected, string reviewStatus, SheetReference source)
         {
             var rowValues = new List<object>
             {
@@ -865,11 +870,13 @@ namespace PandoraBot.Services
                 hunter.MaxHp,
                 hunter.CurrentHp,
                 selected,
-                reviewStatus
+                reviewStatus,
+                source.SpreadsheetId,
+                source.SheetName
             };
 
             var storageSheetName = ToRangeSheetName(StorageSheet);
-            var writeRange = $"{storageSheetName}!A{rowNumber}:L{rowNumber}";
+            var writeRange = $"{storageSheetName}!A{rowNumber}:N{rowNumber}";
             var valueRange = new ValueRange { Values = new List<IList<object>> { rowValues } };
 
             var updateRequest = service.Spreadsheets.Values.Update(valueRange, storageSpreadsheetId, writeRange);
@@ -880,7 +887,7 @@ namespace PandoraBot.Services
         private async Task ClearStorageRowAsync(int rowNumber)
         {
             var storageSheetName = ToRangeSheetName(StorageSheet);
-            var clearRequest = service.Spreadsheets.Values.Clear(new ClearValuesRequest(), storageSpreadsheetId, $"{storageSheetName}!A{rowNumber}:L{rowNumber}");
+            var clearRequest = service.Spreadsheets.Values.Clear(new ClearValuesRequest(), storageSpreadsheetId, $"{storageSheetName}!A{rowNumber}:N{rowNumber}");
             await clearRequest.ExecuteAsync();
         }
 
@@ -927,6 +934,7 @@ namespace PandoraBot.Services
             }
 
             await WriteHeaderRowAsync(StorageSheet, "L1", new List<object> { "검수상태" });
+            await WriteHeaderRowAsync(StorageSheet, "M1:N1", new List<object> { "원본스프레드시트ID", "원본시트명" });
             await WriteHeaderRowAsync(JudgementLogSheet, "A1:M1", new List<object>
             {
                 "시각", "서버ID", "채널ID", "유저ID", "유저명", "캐릭터", "능력코드", "능력치", "주사위1", "주사위2", "수정치", "최종값", "결과"
@@ -1200,7 +1208,9 @@ namespace PandoraBot.Services
             int MaxHp,
             int CurrentHp,
             string Selected,
-            string ReviewStatus)
+            string ReviewStatus,
+            string SourceSpreadsheetId,
+            string SourceSheetName)
         {
             public Hunter ToHunter()
             {
@@ -1215,9 +1225,14 @@ namespace PandoraBot.Services
                     Wisdom = Wisdom,
                     Charisma = Charisma,
                     MaxHp = MaxHp,
-                    CurrentHp = CurrentHp
+                    CurrentHp = ClampHp(CurrentHp, MaxHp)
                 };
             }
+        }
+
+        private static int ClampHp(int currentHp, int maxHp)
+        {
+            return maxHp > 0 ? Math.Clamp(currentHp, 0, maxHp) : Math.Max(currentHp, 0);
         }
     }
 }

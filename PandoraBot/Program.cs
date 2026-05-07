@@ -45,7 +45,7 @@ public class Program
             throw new InvalidOperationException("Set DiscordToken in BotSettings.json.");
         }
 
-        await client.LoginAsync(TokenType.Bot, settings.DiscordToken.Trim());
+        await client.LoginAsync(TokenType.Bot, NormalizeDiscordToken(settings.DiscordToken));
         await client.StartAsync();
 
         await Task.Delay(-1);
@@ -109,6 +109,18 @@ public class Program
 
         Console.WriteLine("[SYSTEM] Google Sheets service initialized.");
         return service;
+    }
+
+    private static string NormalizeDiscordToken(string token)
+    {
+        var normalized = token.Trim().Trim('"', '\'', ',', ';');
+        const string botPrefix = "Bot ";
+        if (normalized.StartsWith(botPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[botPrefix.Length..].Trim();
+        }
+
+        return normalized.Trim().Trim('"', '\'', ',', ';');
     }
 
     private sealed class BotSettings

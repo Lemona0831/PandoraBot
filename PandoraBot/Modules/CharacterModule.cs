@@ -28,6 +28,27 @@ namespace PandoraBot.Modules
             }
         }
 
+        [SlashCommand("갱신", "원본 캐릭터 시트를 다시 읽어 저장소의 캐릭터 정보를 갱신합니다.")]
+        public async Task RefreshCharacter(
+            [Summary("시트", "캐릭터 원본 시트 이름 또는 Google Sheets URL")] string sourceSheet)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                var result = await GoogleSheetService.Instance.RegisterAsync(sourceSheet, Context.User.Id.ToString());
+                var message = result.WasUpdated
+                    ? $"`{result.Hunter.CharacterName}` 정보를 원본 시트 기준으로 갱신했습니다. (row {result.RowNumber})"
+                    : $"`{result.Hunter.CharacterName}` 정보를 새로 등록했습니다. 진행자 승인 후 사용할 수 있습니다. (row {result.RowNumber})";
+
+                await FollowupAsync(message, ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
         [SlashCommand("선택", "등록된 캐릭터 중 사용할 캐릭터를 선택합니다.")]
         public async Task SelectCharacter(
             [Summary("캐릭터", "등록된 캐릭터 이름")] string characterName)

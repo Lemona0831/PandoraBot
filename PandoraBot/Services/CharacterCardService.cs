@@ -17,14 +17,16 @@ namespace PandoraBot.Services
         {
             var image = new Image<Rgba32>(Width, Height);
             using var ornament = LoadOrnamentBackground();
-            var hpRatio = hunter.MaxHp > 0 ? Math.Clamp((double)hunter.CurrentHp / hunter.MaxHp, 0, 1) : 0;
+            var maxHp = Math.Max(hunter.MaxHp, 0);
+            var currentHp = maxHp > 0 ? Math.Clamp(hunter.CurrentHp, 0, maxHp) : 0;
+            var hpRatio = maxHp > 0 ? (double)currentHp / maxHp : 0;
 
             image.Mutate(ctx =>
             {
                 DrawBackground(ctx, ornament);
                 DrawFrame(ctx);
                 DrawHeader(ctx, hunter, ownerName);
-                DrawHpPanel(ctx, hunter, hpRatio);
+                DrawHpPanel(ctx, hunter, currentHp, maxHp, hpRatio);
                 DrawStats(ctx, hunter);
                 DrawFooter(ctx);
             });
@@ -89,14 +91,14 @@ namespace PandoraBot.Services
             ctx.DrawText("ACTIVE", Font(18, FontStyle.Bold), Hex("72E39A"), new PointF(752, 135));
         }
 
-        private static void DrawHpPanel(IImageProcessingContext ctx, Hunter hunter, double hpRatio)
+        private static void DrawHpPanel(IImageProcessingContext ctx, Hunter hunter, int currentHp, int maxHp, double hpRatio)
         {
             ctx.Fill(Hex("0F1422"), new RectangularPolygon(76, 232, 808, 108));
             ctx.Draw(Hex("2E3858"), 1, new RectangularPolygon(76, 232, 808, 108));
             ctx.Fill(Hex("192033"), new RectangularPolygon(76, 232, 808, 4));
 
             ctx.DrawText("VITAL SIGN", Font(17, FontStyle.Bold), Hex("8EEAFF"), new PointF(100, 254));
-            ctx.DrawText($"HP {hunter.CurrentHp} / {hunter.MaxHp}", Font(32, FontStyle.Bold), Hex("F4F7FF"), new PointF(100, 282));
+            ctx.DrawText($"HP {currentHp} / {maxHp}", Font(32, FontStyle.Bold), Hex("F4F7FF"), new PointF(100, 282));
             ctx.DrawText($"{Math.Round(hpRatio * 100)}%", Font(24, FontStyle.Bold), HpColor(hpRatio), new PointF(770, 282));
 
             ctx.Fill(Hex("252C43"), new RectangularPolygon(278, 289, 452, 24));

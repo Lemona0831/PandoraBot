@@ -19,7 +19,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -79,6 +80,30 @@ h1 {
   color: #79e6ff;
 }
 
+.page-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(133, 188, 255, 0.28);
+  background: rgba(25, 40, 68, 0.72);
+}
+
+.page-tabs a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  color: #b7cce2;
+  text-decoration: none;
+  font-weight: 900;
+}
+
+.page-tabs a.active {
+  background: rgba(101, 207, 255, 0.16);
+  color: #79e6ff;
+}
+
 .notice {
   margin-top: 18px;
   padding: 14px 18px;
@@ -93,6 +118,10 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-top: 18px;
+}
+
+.stats-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .stat-card {
@@ -152,7 +181,17 @@ input {
   outline: none;
 }
 
-input:focus {
+select {
+  min-width: 132px;
+  padding: 12px 14px;
+  border: 1px solid rgba(128, 201, 255, 0.32);
+  background: rgba(5, 14, 29, 0.86);
+  color: #f3fbff;
+  outline: none;
+}
+
+input:focus,
+select:focus {
   border-color: #59caff;
   box-shadow: 0 0 0 3px rgba(89, 202, 255, 0.15);
 }
@@ -183,9 +222,17 @@ button.secondary {
 }
 
 button.danger,
-.danger-outline {
+.danger-outline,
+button.reject,
+button.damage {
   border-color: rgba(255, 118, 118, 0.45);
   background: rgba(125, 35, 48, 0.9);
+}
+
+button.approve,
+button.heal {
+  border-color: rgba(105, 235, 166, 0.42);
+  background: rgba(39, 124, 82, 0.88);
 }
 
 .danger-outline {
@@ -196,6 +243,12 @@ button.danger,
   margin-top: 18px;
   border: 1px solid rgba(93, 174, 227, 0.29);
   background: rgba(8, 18, 35, 0.92);
+}
+
+.form-panel {
+  margin-top: 18px;
+  border: 1px solid rgba(93, 174, 227, 0.29);
+  background: rgba(8, 18, 35, 0.9);
 }
 
 .panel-heading {
@@ -219,6 +272,77 @@ button.danger,
 .panel-heading span {
   color: #72dfff;
   font-weight: 900;
+}
+
+.compact-heading {
+  padding-bottom: 14px;
+}
+
+.enemy-create-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 22px 22px;
+}
+
+.enemy-create-form label,
+.enemy-create-form fieldset {
+  min-width: 0;
+}
+
+.enemy-create-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.enemy-create-form label span,
+.enemy-create-form legend {
+  color: #9fc4df;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.enemy-create-form input,
+.enemy-create-form select {
+  width: 100%;
+}
+
+.enemy-create-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(68px, 1fr));
+  gap: 10px;
+  grid-column: span 3;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(128, 201, 255, 0.18);
+  background: rgba(5, 14, 29, 0.44);
+}
+
+.enemy-create-form fieldset label {
+  gap: 6px;
+}
+
+.enemy-create-form fieldset input {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.wide-field {
+  grid-column: span 2;
+}
+
+.form-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+.drop-create-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.drop-create-form .wide-field {
+  grid-column: span 2;
 }
 
 .table-wrap {
@@ -265,6 +389,74 @@ tbody tr.duplicate {
   font-size: 17px;
 }
 
+.advanced-details {
+  margin-top: 7px;
+  color: #91a8c2;
+  font-size: 12px;
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.advanced-details div {
+  margin-top: 5px;
+}
+
+.stat-edit-details {
+  max-width: 360px;
+}
+
+.stat-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.stat-edit-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.stat-edit-form label span {
+  color: #9fc4df;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stat-edit-form input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.readonly-stat {
+  display: grid;
+  gap: 4px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #2f4e74;
+  background: #091222;
+}
+
+.readonly-stat span {
+  color: #9fc4df;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.readonly-stat strong {
+  color: #65e6c4;
+  font-size: 14px;
+}
+
+.stat-edit-form button {
+  grid-column: span 2;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -279,6 +471,24 @@ tbody tr.duplicate {
   border-color: rgba(105, 235, 166, 0.4);
   background: rgba(105, 235, 166, 0.14);
   color: #8affc1;
+}
+
+.badge.approved {
+  border-color: rgba(105, 235, 166, 0.36);
+  background: rgba(105, 235, 166, 0.12);
+  color: #8affc1;
+}
+
+.badge.pending {
+  border-color: rgba(255, 211, 106, 0.38);
+  background: rgba(255, 211, 106, 0.12);
+  color: #ffd36a;
+}
+
+.badge.rejected {
+  border-color: rgba(255, 118, 118, 0.44);
+  background: rgba(255, 118, 118, 0.12);
+  color: #ff9f9f;
 }
 
 .badge.muted {
@@ -296,7 +506,8 @@ tbody tr.duplicate {
 .hp-line {
   display: grid;
   gap: 7px;
-  min-width: 130px;
+  min-width: 240px;
+  max-width: 360px;
 }
 
 .hp-track {
@@ -308,6 +519,47 @@ tbody tr.duplicate {
 .hp-track div {
   height: 100%;
   background: linear-gradient(90deg, #54d8ff, #72efa7);
+}
+
+.hp-controls {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.quick-hp-actions {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(38px, 1fr));
+  gap: 6px;
+}
+
+.hp-controls .quick-hp-actions form {
+  display: contents;
+}
+
+.quick-hp-actions button {
+  min-height: 36px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+.hp-controls form {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 54px;
+  gap: 6px;
+}
+
+.hp-controls input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.hp-controls button {
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .stat-list {
@@ -328,6 +580,186 @@ tbody tr.duplicate {
   color: #ffd96f;
 }
 
+.state-stack {
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+
+.state-stack b {
+  color: #ffd96f;
+}
+
+.enemy-region {
+  margin-top: 6px;
+  color: #91a8c2;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.enemy-stats {
+  grid-template-columns: repeat(2, minmax(82px, 1fr));
+  gap: 5px 16px;
+}
+
+.enemy-stats span {
+  width: auto;
+}
+
+.enemy-detail {
+  margin-top: 10px;
+}
+
+.enemy-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px;
+  min-width: 360px;
+  margin-top: 10px;
+}
+
+.enemy-edit-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.enemy-edit-form span,
+.toggle-field {
+  color: #9fc4df;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.enemy-edit-form input,
+.enemy-edit-form select {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.enemy-edit-form .wide-field,
+.enemy-edit-form button {
+  grid-column: span 2;
+}
+
+.toggle-field {
+  display: flex !important;
+  grid-column: span 2;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-field input {
+  width: auto;
+  min-height: auto;
+}
+
+.inline-select-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px;
+  max-width: 280px;
+}
+
+.inline-select-form select {
+  min-width: 0;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.inline-select-form button {
+  min-height: 38px;
+}
+
+.inline-number-form {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 54px;
+  gap: 6px;
+}
+
+.inline-number-form input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.inline-number-form button {
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.compact-action-form {
+  margin-top: 8px;
+}
+
+.compact-action-form button {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.drop-link-list {
+  display: grid;
+  gap: 5px;
+  min-width: 160px;
+  margin-top: 8px;
+  color: #cbd9e9;
+  font-size: 12px;
+}
+
+.drop-link-list b {
+  color: #ffd96f;
+}
+
+.muted-text {
+  color: #91a8c2;
+}
+
+.enemy-table {
+  min-width: 1280px;
+}
+
+.drop-table {
+  min-width: 960px;
+}
+
+.drop-setting-table {
+  min-width: 1040px;
+}
+
+.drop-setting-form {
+  display: none;
+}
+
+.drop-setting-table input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.percent-input {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 140px;
+}
+
+.percent-input span {
+  color: #9fc4df;
+  font-weight: 900;
+}
+
+.selection-user {
+  color: #91a8c2;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -338,6 +770,10 @@ tbody tr.duplicate {
   min-height: 34px;
   padding: 0 10px;
   font-size: 12px;
+}
+
+.actions form {
+  min-width: 0;
 }
 
 .empty {
@@ -366,7 +802,21 @@ tbody tr.duplicate {
     display: grid;
   }
 
+  .enemy-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .enemy-create-form fieldset,
+  .wide-field,
+  .drop-create-form .wide-field {
+    grid-column: auto;
+  }
+
   input {
+    width: 100%;
+  }
+
+  select {
     width: 100%;
   }
 }
@@ -378,5 +828,17 @@ tbody tr.duplicate {
 
   h1 {
     font-size: 27px;
+  }
+
+  .quick-hp-actions {
+    grid-template-columns: repeat(2, minmax(56px, 1fr));
+  }
+
+  .enemy-create-form fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actions button {
+    min-height: 40px;
   }
 }
