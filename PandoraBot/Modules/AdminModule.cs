@@ -540,6 +540,29 @@ namespace PandoraBot.Modules
                 await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
             }
         }
+
+        [SlashCommand("\uC804\uD22C\uBCF4\uC870", "\uAD00\uB9AC\uC790\uC6A9: \uC218\uB3D9 \uC804\uD22C \uC9C4\uD589\uC5D0 \uD544\uC694\uD55C \uBA85\uB839 \uD750\uB984\uC744 \uC548\uB0B4\uD569\uB2C8\uB2E4.")]
+        public async Task ShowCombatHelper()
+        {
+            var embed = new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | COMBAT HELPER")
+                .WithColor(new Color(90, 190, 255))
+                .WithDescription("\uC804\uD22C \uC138\uC158 \uC2DC\uC2A4\uD15C \uC5C6\uC774 \uC9C4\uD589\uC790\uAC00 \uC218\uB3D9\uC73C\uB85C \uC804\uD22C\uB97C \uC6B4\uC601\uD560 \uB54C \uC0AC\uC6A9\uD558\uB294 \uBA85\uB839 \uD750\uB984\uC785\uB2C8\uB2E4.")
+                .AddField("1. \uC5D0\uB108\uBBF8 \uD655\uC778", "`/에너미목록`\n`/에너미조회`", inline: false)
+                .AddField("2. \uD50C\uB808\uC774\uC5B4 \uD310\uC815", "`/판정`", inline: false)
+                .AddField("3. \uC5D0\uB108\uBBF8 \uD310\uC815", "`/에너미판정`", inline: false)
+                .AddField("4. HP \uC870\uC791", "`/피해`\n`/회복`\n`/관리체력`", inline: false)
+                .AddField("5. \uBCF4\uC0C1 \uAD74\uB9BC", "`/드롭`\n`/드롭테스트`", inline: false)
+                .AddField(
+                    "1.0 \uBC94\uC704",
+                    "`/전투시작`, `/전투종료`, 턴/라운드 관리는 아직 제공하지 않습니다.\n진행자가 수동으로 전투 흐름을 관리하고, 봇은 판정/HP/드롭을 보조합니다.",
+                    inline: false)
+                .WithFooter("PANDORA NETWORK / MANUAL COMBAT SUPPORT")
+                .WithCurrentTimestamp()
+                .Build();
+
+            await RespondAsync(embed: embed, ephemeral: true);
+        }
         private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
         {
             await DeferAsync(ephemeral: true);
