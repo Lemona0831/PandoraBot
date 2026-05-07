@@ -477,6 +477,69 @@ namespace PandoraBot.Modules
                 await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
             }
         }
+
+        [SlashCommand("\uB4DC\uB86D\uD14C\uC2A4\uD2B8", "\uAD00\uB9AC\uC790\uC6A9: \uC5D0\uB108\uBBF8 \uB4DC\uB86D \uD655\uB960\uC744 \uC2DC\uBBAC\uB808\uC774\uC158\uD569\uB2C8\uB2E4.")]
+        public async Task TestEnemyDrops(
+            [Summary("\uC5D0\uB108\uBBF8", "\uC5D0\uB108\uBBF8 ID \uB610\uB294 \uC774\uB984 \uC77C\uBD80")] string enemy,
+            [Summary("\uBC18\uBCF5\uD69F\uC218", "\uC2DC\uBBAC\uB808\uC774\uC158 \uBC18\uBCF5 \uD69F\uC218, \uCD5C\uB300 1000\uD68C")] int iterations = 100)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (iterations <= 0)
+                {
+                    await FollowupAsync("\uBC18\uBCF5\uD69F\uC218\uB294 1 \uC774\uC0C1\uC73C\uB85C \uC785\uB825\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                if (!result.Found)
+                {
+                    if (result.HasMultipleMatches)
+                    {
+                        await FollowupAsync(embed: BuildEnemyCandidateEmbed(result.Matches, enemy), ephemeral: true);
+                        return;
+                    }
+
+                    await FollowupAsync($"\uC5D0\uB108\uBBF8 `{enemy}`\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. `/\uC5D0\uB108\uBBF8\uBAA9\uB85D`\uC73C\uB85C \uB4F1\uB85D \uBAA9\uB85D\uC744 \uBA3C\uC800 \uD655\uC778\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var found = result.Enemy!;
+                var testCount = Math.Clamp(iterations, 1, 1000);
+                var rolls = new List<DropRollResult>();
+                for (var i = 0; i < testCount; i++)
+                {
+                    rolls.Add(await GoogleSheetService.Instance.Drops.RollDropAsync(found.EnemyId, writeLog: false));
+                }
+
+                var items = rolls
+                    .SelectMany(roll => roll.Items)
+                    .GroupBy(item => item.ItemName, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new DropSummaryItem(group.First().ItemName, group.Sum(item => item.Count)))
+                    .OrderByDescending(item => item.Count)
+                    .ThenBy(item => item.ItemName)
+                    .ToList();
+
+                var occurred = rolls.Count(roll => roll.Occurred);
+                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                    "\uB4DC\uB86D\uD14C\uC2A4\uD2B8",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    "",
+                    found.Name,
+                    $"{found.EnemyId} / {testCount}\uD68C / \uBC1C\uC0DD {occurred}\uD68C / \uD56D\uBAA9 {items.Count}\uAC1C");
+
+                await FollowupAsync(
+                    embed: BuildDropTestEmbed(found, testCount, iterations, rolls, items),
+                    ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
         private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
         {
             await DeferAsync(ephemeral: true);
@@ -740,6 +803,46 @@ namespace PandoraBot.Modules
             return embed.Build();
         }
 
+        private static Embed BuildDropTestEmbed(EnemyRow enemy, int testCount, int requestedIterations, IReadOnlyList<DropRollResult> rolls, IReadOnlyList<DropSummaryItem> items)
+        {
+            var shown = items.Take(12).ToList();
+            var occurred = rolls.Count(roll => roll.Occurred);
+            var totalItemCount = items.Sum(item => item.Count);
+            var description = shown.Count == 0
+                ? "- \uC804\uB9AC\uD488 \uC5C6\uC74C"
+                : string.Join("\n", shown.Select(item =>
+                    $"- {item.ItemName} x{item.Count} ({FormatPercent(item.Count, testCount)})"));
+
+            var embed = new EmbedBuilder()
+                .WithTitle($"[\uB4DC\uB86D\uD14C\uC2A4\uD2B8] {enemy.Name} x{testCount}")
+                .WithColor(new Color(180, 150, 255))
+                .WithDescription("\uC774 \uACB0\uACFC\uB294 \uC2E4\uC81C \uBCF4\uC0C1 \uC9C0\uAE09\uC774 \uC544\uB2CC \uD655\uB960 \uD14C\uC2A4\uD2B8\uC785\uB2C8\uB2E4.\n\n" + description)
+                .AddField("\uB300\uC0C1", $"{enemy.EnemyId} | {enemy.Name}", inline: true)
+                .AddField("\uBC18\uBCF5", $"{testCount}\uD68C", inline: true)
+                .AddField("\uB4DC\uB86D \uBC1C\uC0DD", $"{occurred} / {testCount} ({FormatPercent(occurred, testCount)})", inline: true)
+                .AddField("\uC804\uB9AC\uD488 \uCD1D\uD569", $"{totalItemCount}\uAC1C", inline: true)
+                .WithFooter("PANDORA NETWORK / DROP TEST ONLY")
+                .WithCurrentTimestamp();
+
+            if (items.Count > shown.Count)
+            {
+                embed.AddField(
+                    "\uD45C\uC2DC \uC81C\uD55C",
+                    $"\uD56D\uBAA9\uC774 \uAE38\uC5B4 \uC0C1\uC704 {shown.Count}\uAC1C\uB9CC \uD45C\uC2DC\uD588\uC2B5\uB2C8\uB2E4. \uB098\uBA38\uC9C0 {items.Count - shown.Count}\uAC1C\uAC00 \uB354 \uC788\uC2B5\uB2C8\uB2E4.",
+                    inline: false);
+            }
+
+            if (requestedIterations != testCount)
+            {
+                embed.AddField(
+                    "\uBC18\uBCF5\uD69F\uC218 \uC81C\uD55C",
+                    $"\uCD5C\uB300 1000\uD68C\uAE4C\uC9C0\uB9CC \uD14C\uC2A4\uD2B8\uD569\uB2C8\uB2E4. \uC694\uCCAD {requestedIterations}\uD68C \uC911 {testCount}\uD68C\uB97C \uC2E4\uD589\uD588\uC2B5\uB2C8\uB2E4.",
+                    inline: false);
+            }
+
+            return embed.Build();
+        }
+
         private static EnemyStatInfo? ResolveEnemyStat(EnemyRow enemy, string ability)
         {
             var normalized = ability.Trim().ToLowerInvariant();
@@ -796,6 +899,16 @@ namespace PandoraBot.Modules
         private static string FormatModifier(int modifier)
         {
             return modifier >= 0 ? $"+{modifier}" : modifier.ToString();
+        }
+
+        private static string FormatPercent(int value, int total)
+        {
+            if (total <= 0)
+            {
+                return "0.0%";
+            }
+
+            return $"{value * 100.0 / total:0.0}%";
         }
 
         private sealed record EnemyStatInfo(string Code, string KoreanName, int Value, int Modifier);
