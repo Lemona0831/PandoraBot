@@ -5,6 +5,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Microsoft.Extensions.Configuration;
+using PandoraBot.Repositories;
 using PandoraBot.Services;
 using PandoraShared.Data;
 using System.Reflection;
@@ -52,6 +53,7 @@ public class Program
         pandoraDb = CreatePandoraDbContext(configuration);
         var sheetsService = CreateSheetsService();
         GoogleSheetService.Initialize(sheetsService);
+        PandoraRepositoryProvider.Initialize(configuration.GetConnectionString("PandoraDb"));
         await interactions.AddModulesAsync(Assembly.GetEntryAssembly(), services: null);
 
         if (string.IsNullOrWhiteSpace(settings.DiscordToken))

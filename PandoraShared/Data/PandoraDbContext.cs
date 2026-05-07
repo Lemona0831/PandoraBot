@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.Configuration;
 
 namespace PandoraShared.Data;
 
@@ -305,10 +306,38 @@ public sealed class PandoraDesignTimeDbContextFactory : IDesignTimeDbContextFact
 {
     public PandoraDbContext CreateDbContext(string[] args)
     {
+        var basePath = ResolveBasePath();
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddJsonFile(Path.Combine("PandoraBot", "appsettings.json"), optional: true)
+            .AddJsonFile(Path.Combine("PandoraBot", "appsettings.Development.json"), optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
         var connectionString =
+            configuration.GetConnectionString("PandoraDb") ??
             Environment.GetEnvironmentVariable("ConnectionStrings__PandoraDb") ??
             "Host=localhost;Port=5432;Database=pandora;Username=postgres;Password=postgres";
 
         return new PandoraDbContext(PandoraDbContextFactory.BuildOptions(connectionString));
+    }
+
+    private static string ResolveBasePath()
+    {
+        var current = Directory.GetCurrentDirectory();
+        if (File.Exists(Path.Combine(current, "PandoraBot.slnx")))
+        {
+            return current;
+        }
+
+        var candidate = Path.GetFullPath(Path.Combine(current, ".."));
+        if (File.Exists(Path.Combine(candidate, "PandoraBot.slnx")))
+        {
+            return candidate;
+        }
+
+        return current;
     }
 }

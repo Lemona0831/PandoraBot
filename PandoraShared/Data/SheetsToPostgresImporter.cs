@@ -85,17 +85,21 @@ public sealed class SheetsToPostgresImporter
             throw new InvalidOperationException("PandoraDb connection is required for apply mode.");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        await ReplaceAllDataAsync(
-            characters,
-            selections,
-            rollLogs,
-            adminLogs,
-            dbEnemies,
-            drops,
-            dropSettings,
-            cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        var executionStrategy = dbContext.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await ReplaceAllDataAsync(
+                characters,
+                selections,
+                rollLogs,
+                adminLogs,
+                dbEnemies,
+                drops,
+                dropSettings,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
 
         return result;
     }
@@ -551,7 +555,7 @@ public sealed class SheetsToPostgresImporter
     {
         if (DateTimeOffset.TryParse(value, out var parsed))
         {
-            return parsed;
+            return parsed.ToUniversalTime();
         }
 
         return fallbackToNow ? DateTimeOffset.UtcNow : DateTimeOffset.MinValue;

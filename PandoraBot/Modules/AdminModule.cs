@@ -1,6 +1,7 @@
 using Discord;
 using Discord.Interactions;
 using PandoraBot.Models;
+using PandoraBot.Repositories;
 using PandoraBot.Services;
 using PandoraShared.Models;
 using System.Text;
@@ -296,7 +297,7 @@ namespace PandoraBot.Modules
 
             try
             {
-                var enemies = await GoogleSheetService.Instance.Enemies.GetEnemiesAsync();
+                var enemies = await PandoraRepositoryProvider.Enemies.GetEnemiesAsync();
                 var filter = category?.Trim() ?? "";
                 if (!string.IsNullOrWhiteSpace(filter))
                 {
@@ -332,7 +333,7 @@ namespace PandoraBot.Modules
 
             try
             {
-                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                var result = await PandoraRepositoryProvider.Enemies.GetEnemyByIdOrNameAsync(enemy);
                 if (!result.Found)
                 {
                     if (result.HasMultipleMatches)
@@ -346,8 +347,8 @@ namespace PandoraBot.Modules
                 }
 
                 var found = result.Enemy!;
-                var drops = await GoogleSheetService.Instance.Drops.GetEnemyDropsAsync();
-                var settings = await GoogleSheetService.Instance.Drops.GetEnemyDropSettingsAsync();
+                var drops = await PandoraRepositoryProvider.Drops.GetEnemyDropsAsync();
+                var settings = await PandoraRepositoryProvider.Drops.GetEnemyDropSettingsAsync();
                 var hasDrops = drops.Any(drop => string.Equals(drop.EnemyId, found.EnemyId, StringComparison.OrdinalIgnoreCase));
                 var hasSetting = settings.Any(setting => string.Equals(setting.EnemyId, found.EnemyId, StringComparison.OrdinalIgnoreCase));
 
@@ -368,7 +369,7 @@ namespace PandoraBot.Modules
 
             try
             {
-                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                var result = await PandoraRepositoryProvider.Enemies.GetEnemyByIdOrNameAsync(enemy);
                 if (!result.Found)
                 {
                     if (result.HasMultipleMatches)
@@ -395,7 +396,7 @@ namespace PandoraBot.Modules
                 var total = diceTotal + stat.Modifier;
                 var outcome = ResolveEnemyOutcome(total);
 
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "\uC5D0\uB108\uBBF8 \uD310\uC815",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -428,7 +429,7 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                var result = await PandoraRepositoryProvider.Enemies.GetEnemyByIdOrNameAsync(enemy);
                 if (!result.Found)
                 {
                     if (result.HasMultipleMatches)
@@ -446,7 +447,7 @@ namespace PandoraBot.Modules
                 var rolls = new List<DropRollResult>();
                 for (var i = 0; i < rollCount; i++)
                 {
-                    rolls.Add(await GoogleSheetService.Instance.Drops.RollDropAsync(found.EnemyId, writeLog: false));
+                    rolls.Add(await PandoraRepositoryProvider.Drops.RollDropAsync(found.EnemyId, writeLog: false));
                 }
 
                 var items = rolls
@@ -460,7 +461,7 @@ namespace PandoraBot.Modules
                     ? "\uC804\uB9AC\uD488 \uC5C6\uC74C"
                     : string.Join(", ", items.Select(item => $"{item.ItemName} x{item.Count}"));
 
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "\uB4DC\uB86D \uAD74\uB9BC",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -493,7 +494,7 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                var result = await PandoraRepositoryProvider.Enemies.GetEnemyByIdOrNameAsync(enemy);
                 if (!result.Found)
                 {
                     if (result.HasMultipleMatches)
@@ -511,7 +512,7 @@ namespace PandoraBot.Modules
                 var rolls = new List<DropRollResult>();
                 for (var i = 0; i < testCount; i++)
                 {
-                    rolls.Add(await GoogleSheetService.Instance.Drops.RollDropAsync(found.EnemyId, writeLog: false));
+                    rolls.Add(await PandoraRepositoryProvider.Drops.RollDropAsync(found.EnemyId, writeLog: false));
                 }
 
                 var items = rolls
@@ -523,7 +524,7 @@ namespace PandoraBot.Modules
                     .ToList();
 
                 var occurred = rolls.Count(roll => roll.Occurred);
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "\uB4DC\uB86D\uD14C\uC2A4\uD2B8",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -555,13 +556,88 @@ namespace PandoraBot.Modules
                 .AddField("5. \uBCF4\uC0C1 \uAD74\uB9BC", "`/드롭`\n`/드롭테스트`", inline: false)
                 .AddField(
                     "1.0 \uBC94\uC704",
-                    "`/전투시작`, `/전투종료`, 턴/라운드 관리는 아직 제공하지 않습니다.\n진행자가 수동으로 전투 흐름을 관리하고, 봇은 판정/HP/드롭을 보조합니다.",
+                    "`/전투시작`, `/전투종료`는 제공하지만 턴/라운드/행동완료/이니셔티브는 제공하지 않습니다.\n진행자가 전투 흐름을 직접 관리하고, 봇은 세션/판정/HP/드롭을 보조합니다.",
                     inline: false)
                 .WithFooter("PANDORA NETWORK / MANUAL COMBAT SUPPORT")
                 .WithCurrentTimestamp()
                 .Build();
 
             await RespondAsync(embed: embed, ephemeral: true);
+        }
+
+        [SlashCommand("\uC804\uD22C\uC2DC\uC791", "\uAD00\uB9AC\uC790\uC6A9: \uD604\uC7AC \uCC44\uB110\uC5D0 \uD65C\uC131 \uC804\uD22C \uC138\uC158\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4.")]
+        public async Task StartCombatSession(
+            [Summary("\uC81C\uBAA9", "\uC804\uD22C \uC138\uC158 \uC81C\uBAA9")] string title)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("\uC804\uD22C \uC138\uC158 \uBA85\uB839\uC740 \uC11C\uBC84 \uCC44\uB110\uC5D0\uC11C\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.", ephemeral: true);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    await FollowupAsync("\uC804\uD22C \uC138\uC158 \uC81C\uBAA9\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var session = await PandoraRepositoryProvider.CombatSessions.StartCombatSessionAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
+                    title.Trim(),
+                    Context.User.Id.ToString());
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "\uC804\uD22C\uC2DC\uC791",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    session.Title,
+                    $"{session.Id} / guild={session.GuildId} / channel={session.ChannelId}");
+
+                await FollowupAsync(embed: BuildCombatSessionStartedEmbed(session), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
+        [SlashCommand("\uC804\uD22C\uC885\uB8CC", "\uAD00\uB9AC\uC790\uC6A9: \uD604\uC7AC \uCC44\uB110\uC758 \uD65C\uC131 \uC804\uD22C \uC138\uC158\uC744 \uC885\uB8CC\uD569\uB2C8\uB2E4.")]
+        public async Task EndCombatSession()
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("\uC804\uD22C \uC138\uC158 \uBA85\uB839\uC740 \uC11C\uBC84 \uCC44\uB110\uC5D0\uC11C\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.", ephemeral: true);
+                    return;
+                }
+
+                var session = await PandoraRepositoryProvider.CombatSessions.EndCombatSessionAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString());
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "\uC804\uD22C\uC885\uB8CC",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    session.Title,
+                    $"{session.Id} / ended_at={session.EndedAt:O}");
+
+                await FollowupAsync(embed: BuildCombatSessionEndedEmbed(session), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
         }
 
         [SlashCommand("\uC804\uD22C\uD53C\uD574", "\uAD00\uB9AC\uC790\uC6A9: \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uC5D0\uAC8C \uD53C\uD574\uB97C \uC801\uC6A9\uD569\uB2C8\uB2E4.")]
@@ -918,6 +994,35 @@ namespace PandoraBot.Modules
             }
 
             return embed.Build();
+        }
+
+        private static Embed BuildCombatSessionStartedEmbed(CombatSessionSummary session)
+        {
+            return new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | COMBAT SESSION STARTED")
+                .WithColor(new Color(90, 190, 255))
+                .WithDescription($"**{session.Title}**")
+                .AddField("세션 ID", session.Id.ToString(), inline: false)
+                .AddField("상태", session.Status, inline: true)
+                .AddField("채널", $"`{session.ChannelId}`", inline: true)
+                .AddField("시작 시각", $"<t:{session.CreatedAt.ToUnixTimeSeconds()}:f>", inline: false)
+                .WithFooter("PANDORA NETWORK / COMBAT SESSION")
+                .Build();
+        }
+
+        private static Embed BuildCombatSessionEndedEmbed(CombatSessionSummary session)
+        {
+            var endedAt = session.EndedAt ?? DateTimeOffset.UtcNow;
+            return new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | COMBAT SESSION ENDED")
+                .WithColor(new Color(255, 120, 90))
+                .WithDescription($"**{session.Title}**")
+                .AddField("세션 ID", session.Id.ToString(), inline: false)
+                .AddField("상태", session.Status, inline: true)
+                .AddField("채널", $"`{session.ChannelId}`", inline: true)
+                .AddField("종료 시각", $"<t:{endedAt.ToUnixTimeSeconds()}:f>", inline: false)
+                .WithFooter("PANDORA NETWORK / COMBAT SESSION")
+                .Build();
         }
 
         private static Embed BuildActiveCombatHpEmbed(GoogleSheetService.ActiveCombatHpResult result, string action, int amount)
