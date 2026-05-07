@@ -151,10 +151,14 @@ public sealed class DropService : SheetServiceBase
         await AppendAdminLogRowAsync("드롭설정", "", input.EnemyId, $"발생률 {dropRate}% / {dropCount}회 / 중복 FALSE");
     }
 
-    public async Task<DropRollResult> RollDropAsync(string enemyId)
+    public async Task<DropRollResult> RollDropAsync(string enemyId, bool writeLog = true)
     {
         var result = await RollDropCoreAsync(enemyId);
-        await AppendAdminLogRowAsync("드롭굴림", "", result.EnemyName, result.Message);
+        if (writeLog)
+        {
+            await AppendAdminLogRowAsync("드롭굴림", "", result.EnemyName, result.Message);
+        }
+
         return result;
     }
 
