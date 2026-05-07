@@ -563,6 +563,60 @@ namespace PandoraBot.Modules
 
             await RespondAsync(embed: embed, ephemeral: true);
         }
+
+        [SlashCommand("\uC804\uD22C\uD53C\uD574", "\uAD00\uB9AC\uC790\uC6A9: \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uC5D0\uAC8C \uD53C\uD574\uB97C \uC801\uC6A9\uD569\uB2C8\uB2E4.")]
+        public async Task DamageActiveCombatParticipant(
+            [Summary("\uB300\uC0C1", "\uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790 ID \uB610\uB294 \uC774\uB984")] string target,
+            [Summary("\uD53C\uD574", "\uC801\uC6A9\uD560 \uD53C\uD574\uB7C9")] int damage,
+            [Summary("\uBA54\uBAA8", "\uC120\uD0DD \uC0AC\uD56D: \uCC98\uB9AC \uBA54\uBAA8")] string? memo = null)
+        {
+            await AdjustActiveCombatHpAsync(target, damage, "damage", memo);
+        }
+
+        [SlashCommand("\uC804\uD22C\uD68C\uBCF5", "\uAD00\uB9AC\uC790\uC6A9: \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uB97C \uD68C\uBCF5\uD569\uB2C8\uB2E4.")]
+        public async Task HealActiveCombatParticipant(
+            [Summary("\uB300\uC0C1", "\uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790 ID \uB610\uB294 \uC774\uB984")] string target,
+            [Summary("\uD68C\uBCF5", "\uC801\uC6A9\uD560 \uD68C\uBCF5\uB7C9")] int heal,
+            [Summary("\uBA54\uBAA8", "\uC120\uD0DD \uC0AC\uD56D: \uCC98\uB9AC \uBA54\uBAA8")] string? memo = null)
+        {
+            await AdjustActiveCombatHpAsync(target, heal, "heal", memo);
+        }
+
+        private async Task AdjustActiveCombatHpAsync(string target, int amount, string action, string? memo)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (amount <= 0)
+                {
+                    await FollowupAsync("\uC218\uCE58\uB294 1 \uC774\uC0C1\uC73C\uB85C \uC785\uB825\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var result = await GoogleSheetService.Instance.AdjustActiveParticipantHpAsync(
+                    target,
+                    amount,
+                    action,
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    memo);
+
+                await FollowupAsync(
+                    embed: BuildActiveCombatHpEmbed(result, action, amount),
+                    ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("active combat participant", StringComparison.OrdinalIgnoreCase))
+                {
+                    await FollowupAsync("\uB300\uC0C1\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. `/전투상태`\uB85C \uD604\uC7AC \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uB97C \uBA3C\uC800 \uD655\uC778\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
         private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
         {
             await DeferAsync(ephemeral: true);
@@ -864,6 +918,29 @@ namespace PandoraBot.Modules
             }
 
             return embed.Build();
+        }
+
+        private static Embed BuildActiveCombatHpEmbed(GoogleSheetService.ActiveCombatHpResult result, string action, int amount)
+        {
+            var isHeal = string.Equals(action, "heal", StringComparison.OrdinalIgnoreCase);
+            var label = isHeal ? "\uC804\uD22C \uD68C\uBCF5" : "\uC804\uD22C \uD53C\uD574";
+            var syncText = string.Equals(result.Type, "player", StringComparison.OrdinalIgnoreCase)
+                ? result.StorageSynced ? "\uCE90\uB9AD\uD130 \uC800\uC7A5\uC18C \uBC18\uC601\uB428" : "\uD65C\uC131 \uCC38\uAC00\uC790\uB9CC \uBC18\uC601\uB428"
+                : "\uD65C\uC131 \uCC38\uAC00\uC790\uB9CC \uBC18\uC601\uB428";
+
+            return new EmbedBuilder()
+                .WithTitle($"PROJECT:PANDORA | {label}")
+                .WithColor(isHeal ? Color.Green : Color.Red)
+                .WithDescription($"**{result.DisplayName}** \uC0C1\uD0DC\uB97C \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4.")
+                .AddField("\uB300\uC0C1", $"{result.DisplayName}\n`{result.ParticipantId}`", inline: false)
+                .AddField("\uAD6C\uBD84", result.Type, inline: true)
+                .AddField("\uCC98\uB9AC", $"{label} `{amount}`", inline: true)
+                .AddField("HP", $"`{result.OldHp} -> {result.CurrentHp} / {result.MaxHp}`", inline: true)
+                .AddField("\uC0C1\uD0DC", result.Status, inline: true)
+                .AddField("\uBC18\uC601", syncText, inline: true)
+                .WithFooter("PANDORA NETWORK / ACTIVE COMBAT")
+                .WithCurrentTimestamp()
+                .Build();
         }
 
         private static EnemyStatInfo? ResolveEnemyStat(EnemyRow enemy, string ability)
