@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PandoraShared\PandoraShared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Credental.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

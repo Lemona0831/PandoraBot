@@ -2,6 +2,8 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
+using PandoraShared.Models;
+using PandoraShared.Services;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -1035,6 +1037,8 @@ sealed class PandoraSheetAdminService
 {
     private readonly SheetsService service;
     private readonly string spreadsheetId;
+    private readonly EnemyService enemyService;
+    private readonly DropService dropService;
     private bool operationalSheetsChecked;
 
     public PandoraSheetAdminService(IHostEnvironment environment)
@@ -1051,6 +1055,9 @@ sealed class PandoraSheetAdminService
             HttpClientInitializer = credential,
             ApplicationName = "PandoraAdmin"
         });
+
+        enemyService = new EnemyService(service, spreadsheetId);
+        dropService = new DropService(service, spreadsheetId, enemyService);
     }
 
     public async Task<IReadOnlyList<CharacterRow>> GetCharactersAsync()
@@ -1102,368 +1109,41 @@ sealed class PandoraSheetAdminService
             .ToList();
     }
 
-    public async Task<IReadOnlyList<EnemyRow>> GetEnemiesAsync()
-    {
-        await EnsureOperationalSheetsAsync();
+    public Task<IReadOnlyList<EnemyRow>> GetEnemiesAsync() =>
+        enemyService.GetEnemiesAsync();
 
-        var response = await service.Spreadsheets.Values.Get(spreadsheetId, $"{RangeSheet(AppConstants.EnemyStorageSheetName)}!A2:P").ExecuteAsync();
-        var values = response.Values ?? new List<IList<object>>();
-        var rows = new List<EnemyRow>();
+    public Task<EnemySearchResult> GetEnemyByIdOrNameAsync(string idOrName) =>
+        enemyService.GetEnemyByIdOrNameAsync(idOrName);
 
-        for (var index = 0; index < values.Count; index++)
-        {
-            var row = values[index];
-            var enemyId = GetString(row, 0);
-            var name = GetString(row, 2);
+    public Task<IReadOnlyList<EnemyDropRow>> GetEnemyDropsAsync() =>
+        dropService.GetEnemyDropsAsync();
 
-            if (string.IsNullOrWhiteSpace(enemyId) && string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
+    public Task<IReadOnlyList<EnemyDropSettingRow>> GetEnemyDropSettingsAsync() =>
+        dropService.GetEnemyDropSettingsAsync();
 
-            rows.Add(new EnemyRow(
-                RowNumber: index + 2,
-                EnemyId: enemyId,
-                Region: GetString(row, 1),
-                Name: name,
-                Category: GetString(row, 3),
-                Strength: GetInt(row, 4),
-                Dexterity: GetInt(row, 5),
-                Constitution: GetInt(row, 6),
-                Intelligence: GetInt(row, 7),
-                Wisdom: GetInt(row, 8),
-                Charisma: GetInt(row, 9),
-                DamageFormula: GetString(row, 10),
-                Dp: GetInt(row, 11),
-                CurrentHp: ClampHp(GetInt(row, 12), GetInt(row, 13)),
-                MaxHp: GetInt(row, 13),
-                Description: GetString(row, 14),
-                IsEnabled: GetString(row, 15)));
-        }
+    public Task<string> AddEnemyAsync(EnemyCreateInput input) =>
+        enemyService.AddEnemyAsync(input);
 
-        return rows
-            .OrderBy(row => row.Region)
-            .ThenBy(row => row.Name)
-            .ThenBy(row => row.RowNumber)
-            .ToList();
-    }
+    public Task AddEnemyDropAsync(EnemyDropCreateInput input) =>
+        dropService.AddEnemyDropAsync(input);
 
-    public async Task<IReadOnlyList<EnemyDropRow>> GetEnemyDropsAsync()
-    {
-        await EnsureOperationalSheetsAsync();
+    public Task SetEnemyDropSettingAsync(EnemyDropSettingInput input) =>
+        dropService.SetEnemyDropSettingAsync(input);
 
-        var response = await service.Spreadsheets.Values.Get(spreadsheetId, $"{RangeSheet(AppConstants.EnemyDropSheetName)}!A2:I").ExecuteAsync();
-        var values = response.Values ?? new List<IList<object>>();
-        var rows = new List<EnemyDropRow>();
+    public Task SetEnemyCategoryAsync(int rowNumber, string category) =>
+        enemyService.SetEnemyCategoryAsync(rowNumber, category);
 
-        for (var index = 0; index < values.Count; index++)
-        {
-            var row = values[index];
-            var enemyId = GetString(row, 0);
-            var itemName = GetString(row, 1);
+    public Task UpdateEnemyAsync(int rowNumber, EnemyEditInput input) =>
+        enemyService.UpdateEnemyAsync(rowNumber, input);
 
-            if (string.IsNullOrWhiteSpace(enemyId) && string.IsNullOrWhiteSpace(itemName))
-            {
-                continue;
-            }
+    public Task<string> DeleteEnemyAsync(int rowNumber) =>
+        enemyService.DeleteEnemyAsync(rowNumber, dropService);
 
-            rows.Add(new EnemyDropRow(
-                RowNumber: index + 2,
-                EnemyId: enemyId,
-                ItemName: itemName,
-                Chance: GetInt(row, 2),
-                MinCount: GetInt(row, 3),
-                MaxCount: GetInt(row, 4),
-                Weight: GetInt(row, 5),
-                Rarity: GetString(row, 6),
-                Tag: GetString(row, 7),
-                Memo: GetString(row, 8)));
-        }
+    public Task<DropRollResult> RollDropAsync(string enemyId) =>
+        dropService.RollDropAsync(enemyId);
 
-        return rows
-            .OrderBy(row => row.EnemyId)
-            .ThenBy(row => row.ItemName)
-            .ThenBy(row => row.RowNumber)
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<EnemyDropSettingRow>> GetEnemyDropSettingsAsync()
-    {
-        await EnsureOperationalSheetsAsync();
-
-        var response = await service.Spreadsheets.Values.Get(spreadsheetId, $"{RangeSheet(AppConstants.EnemyDropSettingSheetName)}!A2:E").ExecuteAsync();
-        var values = response.Values ?? new List<IList<object>>();
-        var rows = new List<EnemyDropSettingRow>();
-
-        for (var index = 0; index < values.Count; index++)
-        {
-            var row = values[index];
-            var enemyId = GetString(row, 0);
-            if (string.IsNullOrWhiteSpace(enemyId))
-            {
-                continue;
-            }
-
-            rows.Add(new EnemyDropSettingRow(
-                RowNumber: index + 2,
-                EnemyId: enemyId,
-                DropRate: Math.Clamp(GetInt(row, 1), 0, 100),
-                DropCount: Math.Max(GetInt(row, 2), 1),
-                AllowDuplicate: false,
-                Memo: GetString(row, 4)));
-        }
-
-        return rows
-            .OrderBy(row => row.EnemyId)
-            .ThenBy(row => row.RowNumber)
-            .ToList();
-    }
-
-    public async Task<string> AddEnemyAsync(EnemyCreateInput input)
-    {
-        var rows = await GetEnemiesAsync();
-        var duplicated = rows.Any(row =>
-            string.Equals(Normalize(row.Region), Normalize(input.Region), StringComparison.Ordinal) &&
-            string.Equals(Normalize(row.Name), Normalize(input.Name), StringComparison.Ordinal));
-
-        if (duplicated)
-        {
-            throw new InvalidOperationException("같은 지역에 같은 이름의 에너미가 이미 있습니다.");
-        }
-
-        var enemyId = CreateNextEnemyId(rows);
-        await AppendRowAsync(AppConstants.EnemyStorageSheetName, new List<object>
-        {
-            enemyId,
-            input.Region,
-            input.Name,
-            NormalizeEnemyCategory(input.Category),
-            input.Strength,
-            input.Dexterity,
-            input.Constitution,
-            input.Intelligence,
-            input.Wisdom,
-            input.Charisma,
-            input.DamageFormula,
-            input.Dp,
-            input.MaxHp,
-            input.MaxHp,
-            input.Description,
-            "TRUE"
-        });
-
-        await AppendAdminLogRowAsync("에너미추가", "", input.Name, $"{enemyId} / {input.Region}");
-        return enemyId;
-    }
-
-    public async Task AddEnemyDropAsync(EnemyDropCreateInput input)
-    {
-        var enemies = await GetEnemiesAsync();
-        if (!enemies.Any(row => string.Equals(row.EnemyId, input.EnemyId, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException("선택한 에너미를 찾을 수 없습니다.");
-        }
-
-        var minCount = input.MinCount;
-        var maxCount = Math.Max(input.MaxCount, minCount);
-        var chance = Math.Clamp(input.Chance, 1, 100);
-        var existingDrops = await GetEnemyDropsAsync();
-        var duplicated = existingDrops.Any(row =>
-            string.Equals(row.EnemyId, input.EnemyId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(Normalize(row.ItemName), Normalize(input.ItemName), StringComparison.Ordinal));
-
-        if (duplicated)
-        {
-            throw new InvalidOperationException("이미 같은 에너미에 같은 전리품이 연결되어 있습니다.");
-        }
-
-        await AppendRowAsync(AppConstants.EnemyDropSheetName, new List<object>
-        {
-            input.EnemyId,
-            input.ItemName,
-            chance,
-            minCount,
-            maxCount,
-            input.Weight,
-            input.Rarity,
-            input.Tag,
-            input.Memo
-        });
-
-        await AppendAdminLogRowAsync("전리품추가", "", input.ItemName, $"{input.EnemyId} / {chance}%");
-    }
-
-    public async Task SetEnemyDropSettingAsync(EnemyDropSettingInput input)
-    {
-        var enemies = await GetEnemiesAsync();
-        if (!enemies.Any(row => string.Equals(row.EnemyId, input.EnemyId, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException("선택한 에너미를 찾을 수 없습니다.");
-        }
-
-        var dropRate = Math.Clamp(input.DropRate, 0, 100);
-        var dropCount = Math.Max(input.DropCount, 1);
-        var values = new List<object> { input.EnemyId, dropRate, dropCount, "FALSE", input.Memo };
-        var settings = await GetEnemyDropSettingsAsync();
-        var existing = settings.FirstOrDefault(row => string.Equals(row.EnemyId, input.EnemyId, StringComparison.OrdinalIgnoreCase));
-
-        if (existing == null)
-        {
-            await AppendRowAsync(AppConstants.EnemyDropSettingSheetName, values);
-        }
-        else
-        {
-            var valueRange = new ValueRange { Values = new List<IList<object>> { values } };
-            var request = service.Spreadsheets.Values.Update(
-                valueRange,
-                spreadsheetId,
-                $"{RangeSheet(AppConstants.EnemyDropSettingSheetName)}!A{existing.RowNumber}:E{existing.RowNumber}");
-
-            request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW;
-            await request.ExecuteAsync();
-        }
-
-        await AppendAdminLogRowAsync("드롭설정", "", input.EnemyId, $"발생률 {dropRate}% / {dropCount}회 / 중복 FALSE");
-    }
-
-    public async Task SetEnemyCategoryAsync(int rowNumber, string category)
-    {
-        var normalized = NormalizeEnemyCategory(category);
-        await UpdateCellAsync(AppConstants.EnemyStorageSheetName, rowNumber, "D", normalized);
-        await AppendAdminLogRowAsync("에너미출현구분", "", "", $"row {rowNumber}: {normalized}");
-    }
-
-    public async Task UpdateEnemyAsync(int rowNumber, EnemyEditInput input)
-    {
-        var rows = await GetEnemiesAsync();
-        var target = rows.FirstOrDefault(row => row.RowNumber == rowNumber)
-            ?? throw new InvalidOperationException("해당 행의 에너미를 찾을 수 없습니다.");
-
-        var duplicated = rows.Any(row =>
-            row.RowNumber != rowNumber &&
-            string.Equals(Normalize(row.Region), Normalize(input.Region), StringComparison.Ordinal) &&
-            string.Equals(Normalize(row.Name), Normalize(input.Name), StringComparison.Ordinal));
-
-        if (duplicated)
-        {
-            throw new InvalidOperationException("같은 지역에 같은 이름의 에너미가 이미 있습니다.");
-        }
-
-        var nextMaxHp = Math.Max(1, input.MaxHp);
-        var nextCurrentHp = Math.Clamp(target.CurrentHp, 0, nextMaxHp);
-        var values = new List<object>
-        {
-            input.Region,
-            input.Name,
-            NormalizeEnemyCategory(input.Category),
-            input.Strength,
-            input.Dexterity,
-            input.Constitution,
-            input.Intelligence,
-            input.Wisdom,
-            input.Charisma,
-            input.DamageFormula,
-            input.Dp,
-            nextCurrentHp,
-            nextMaxHp,
-            input.Description,
-            input.IsEnabled ? "TRUE" : "FALSE"
-        };
-
-        var valueRange = new ValueRange { Values = new List<IList<object>> { values } };
-        var request = service.Spreadsheets.Values.Update(
-            valueRange,
-            spreadsheetId,
-            $"{RangeSheet(AppConstants.EnemyStorageSheetName)}!B{rowNumber}:P{rowNumber}");
-
-        request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW;
-        await request.ExecuteAsync();
-        await AppendAdminLogRowAsync("에너미수정", "", target.Name, $"{target.EnemyId}: {target.Name} -> {input.Name}");
-    }
-
-    public async Task<string> DeleteEnemyAsync(int rowNumber)
-    {
-        var rows = await GetEnemiesAsync();
-        var target = rows.FirstOrDefault(row => row.RowNumber == rowNumber)
-            ?? throw new InvalidOperationException("해당 행의 에너미를 찾을 수 없습니다.");
-
-        await service.Spreadsheets.Values.Clear(
-            new ClearValuesRequest(),
-            spreadsheetId,
-            $"{RangeSheet(AppConstants.EnemyStorageSheetName)}!A{rowNumber}:P{rowNumber}").ExecuteAsync();
-
-        var drops = await GetEnemyDropsAsync();
-        foreach (var drop in drops.Where(row => string.Equals(row.EnemyId, target.EnemyId, StringComparison.OrdinalIgnoreCase)))
-        {
-            await service.Spreadsheets.Values.Clear(
-                new ClearValuesRequest(),
-                spreadsheetId,
-                $"{RangeSheet(AppConstants.EnemyDropSheetName)}!A{drop.RowNumber}:I{drop.RowNumber}").ExecuteAsync();
-        }
-
-        var settings = await GetEnemyDropSettingsAsync();
-        foreach (var setting in settings.Where(row => string.Equals(row.EnemyId, target.EnemyId, StringComparison.OrdinalIgnoreCase)))
-        {
-            await service.Spreadsheets.Values.Clear(
-                new ClearValuesRequest(),
-                spreadsheetId,
-                $"{RangeSheet(AppConstants.EnemyDropSettingSheetName)}!A{setting.RowNumber}:E{setting.RowNumber}").ExecuteAsync();
-        }
-
-        await AppendAdminLogRowAsync("에너미삭제", "", target.Name, $"{target.EnemyId} / 연결 드롭 삭제");
-        return target.Name;
-    }
-
-    public async Task<DropTestResult> TestEnemyDropAsync(string enemyId)
-    {
-        var enemies = await GetEnemiesAsync();
-        var enemy = enemies.FirstOrDefault(row => string.Equals(row.EnemyId, enemyId, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException("선택한 에너미를 찾을 수 없습니다.");
-        var drops = (await GetEnemyDropsAsync())
-            .Where(row => string.Equals(row.EnemyId, enemyId, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var setting = (await GetEnemyDropSettingsAsync())
-            .FirstOrDefault(row => string.Equals(row.EnemyId, enemyId, StringComparison.OrdinalIgnoreCase))
-            ?? new EnemyDropSettingRow(0, enemyId, 100, 1, false, "");
-
-        if (drops.Count == 0)
-        {
-            return new DropTestResult($"{enemy.Name}: 연결된 전리품이 없습니다.");
-        }
-
-        var occurRoll = Random.Shared.Next(1, 101);
-        if (occurRoll > setting.DropRate)
-        {
-            return new DropTestResult($"{enemy.Name}: 전리품 없음 (발생 {setting.DropRate}%, 굴림 {occurRoll})");
-        }
-
-        var remaining = drops.ToList();
-        var results = new List<string>();
-        for (var i = 0; i < setting.DropCount && remaining.Count > 0; i++)
-        {
-            var passed = remaining
-                .Where(drop => Random.Shared.Next(1, 101) <= Math.Clamp(drop.Chance, 1, 100))
-                .ToList();
-
-            if (passed.Count == 0)
-            {
-                continue;
-            }
-
-            var selected = passed[Random.Shared.Next(passed.Count)];
-            var count = Random.Shared.Next(selected.MinCount, Math.Max(selected.MaxCount, selected.MinCount) + 1);
-            results.Add($"{selected.ItemName} x{count}");
-            remaining.RemoveAll(drop => drop.RowNumber == selected.RowNumber);
-        }
-
-        var message = results.Count == 0
-            ? $"{enemy.Name}: 전리품 발생은 성공했지만 개별 전리품 확률을 통과하지 못했습니다."
-            : $"{enemy.Name}: {string.Join(", ", results)}";
-
-        await AppendAdminLogRowAsync("드롭테스트", "", enemy.Name, message);
-        return new DropTestResult(message);
-    }
-
+    public Task<DropTestResult> TestEnemyDropAsync(string enemyId) =>
+        dropService.TestDropAsync(enemyId);
     public async Task SetHpAsync(int rowNumber, int hp)
     {
         var rows = await GetCharactersAsync();
@@ -1946,95 +1626,6 @@ sealed record CharacterStatsInput(
     int Intelligence,
     int Wisdom,
     int Charisma);
-
-sealed record EnemyRow(
-    int RowNumber,
-    string EnemyId,
-    string Region,
-    string Name,
-    string Category,
-    int Strength,
-    int Dexterity,
-    int Constitution,
-    int Intelligence,
-    int Wisdom,
-    int Charisma,
-    string DamageFormula,
-    int Dp,
-    int CurrentHp,
-    int MaxHp,
-    string Description,
-    string IsEnabled);
-
-sealed record EnemyDropRow(
-    int RowNumber,
-    string EnemyId,
-    string ItemName,
-    int Chance,
-    int MinCount,
-    int MaxCount,
-    int Weight,
-    string Rarity,
-    string Tag,
-    string Memo);
-
-sealed record EnemyDropSettingRow(
-    int RowNumber,
-    string EnemyId,
-    int DropRate,
-    int DropCount,
-    bool AllowDuplicate,
-    string Memo);
-
-sealed record EnemyCreateInput(
-    string Region,
-    string Name,
-    string Category,
-    int Strength,
-    int Dexterity,
-    int Constitution,
-    int Intelligence,
-    int Wisdom,
-    int Charisma,
-    string DamageFormula,
-    int Dp,
-    int MaxHp,
-    string Description);
-
-sealed record EnemyEditInput(
-    string Region,
-    string Name,
-    string Category,
-    int Strength,
-    int Dexterity,
-    int Constitution,
-    int Intelligence,
-    int Wisdom,
-    int Charisma,
-    string DamageFormula,
-    int Dp,
-    int MaxHp,
-    string Description,
-    bool IsEnabled);
-
-sealed record EnemyDropCreateInput(
-    string EnemyId,
-    string ItemName,
-    int Chance,
-    int MinCount,
-    int MaxCount,
-    int Weight,
-    string Rarity,
-    string Tag,
-    string Memo);
-
-sealed record EnemyDropSettingInput(
-    string EnemyId,
-    int DropRate,
-    int DropCount,
-    string Memo);
-
-sealed record DropTestResult(string Message);
 
 sealed class BotSettings
 {

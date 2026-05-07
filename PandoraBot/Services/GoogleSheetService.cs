@@ -1,6 +1,7 @@
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 using PandoraBot.Models;
+using PandoraShared.Services;
 using System.Text.RegularExpressions;
 
 namespace PandoraBot.Services
@@ -25,10 +26,15 @@ namespace PandoraBot.Services
         private readonly string storageSpreadsheetId;
         private bool operationalSheetsChecked;
 
+        public EnemyService Enemies { get; }
+        public DropService Drops { get; }
+
         private GoogleSheetService(SheetsService service, string storageSpreadsheetId)
         {
             this.service = service;
             this.storageSpreadsheetId = storageSpreadsheetId;
+            Enemies = new EnemyService(service, storageSpreadsheetId);
+            Drops = new DropService(service, storageSpreadsheetId, Enemies);
         }
 
         public static GoogleSheetService Instance =>
