@@ -1,5 +1,9 @@
 # PROJECT:PANDORA
 
+## Opening Checklist
+
+- [Opening smoke test](docs/SMOKE_TEST.md)
+
 Discord 기반 TRPG 운영 자동화 봇 및 관리자 대시보드입니다.  
 캐릭터 등록, 선택, 조회, 상태창 이미지 출력, 기본 판정, 도움말, 관리자용 캐릭터 관리를 통해 어반 판타지 커뮤니티 운영 흐름을 자동화하는 것을 목표로 합니다.
 
