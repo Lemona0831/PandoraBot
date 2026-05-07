@@ -4,7 +4,9 @@ using Discord.WebSocket;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
+using Microsoft.Extensions.Configuration;
 using PandoraBot.Services;
+using PandoraShared.Data;
 using System.Reflection;
 using System.Text.Json;
 
@@ -12,6 +14,7 @@ public class Program
 {
     private DiscordSocketClient? client;
     private InteractionService? interactions;
+    private PandoraDbContext? pandoraDb;
     private BotSettings settings = new();
 
     public static Task Main(string[] args) => new Program().MainAsync();
@@ -19,6 +22,7 @@ public class Program
     public async Task MainAsync()
     {
         settings = BotSettings.Load();
+        var configuration = BuildConfiguration();
 
         var config = new DiscordSocketConfig
         {
@@ -36,6 +40,7 @@ public class Program
         client.Ready += Ready;
         client.InteractionCreated += HandleInteractionAsync;
 
+        pandoraDb = CreatePandoraDbContext(configuration);
         var sheetsService = CreateSheetsService();
         GoogleSheetService.Initialize(sheetsService);
         await interactions.AddModulesAsync(Assembly.GetEntryAssembly(), services: null);
@@ -49,6 +54,16 @@ public class Program
         await client.StartAsync();
 
         await Task.Delay(-1);
+    }
+
+    private static IConfigurationRoot BuildConfiguration()
+    {
+        return new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
     }
 
     private Task Log(LogMessage msg)
@@ -84,7 +99,29 @@ public class Program
 
         if (!result.IsSuccess)
         {
-            Console.WriteLine($"[Interaction Error] {result.ErrorReason}");
+        Console.WriteLine($"[Interaction Error] {result.ErrorReason}");
+        }
+    }
+
+    private PandoraDbContext? CreatePandoraDbContext(IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("PandoraDb");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            Console.WriteLine("[SYSTEM] PandoraDb connection string not configured. Continuing with Google Sheets mode.");
+            return null;
+        }
+
+        try
+        {
+            var context = PandoraDbContextFactory.CreateOrNull(connectionString);
+            Console.WriteLine("[SYSTEM] PandoraDb scaffold configured from ConnectionStrings:PandoraDb.");
+            return context;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SYSTEM] PandoraDb scaffold disabled: {ex.Message}");
+            return null;
         }
     }
 
