@@ -358,6 +358,60 @@ namespace PandoraBot.Modules
                 await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
             }
         }
+
+        [SlashCommand("\uC5D0\uB108\uBBF8\uD310\uC815", "\uAD00\uB9AC\uC790\uC6A9: \uC5D0\uB108\uBBF8 \uB2A5\uB825\uCE58\uB85C 2d6 \uD310\uC815\uC744 \uAD74\uB9BD\uB2C8\uB2E4.")]
+        public async Task RollEnemy(
+            [Summary("\uC5D0\uB108\uBBF8", "\uC5D0\uB108\uBBF8 ID \uB610\uB294 \uC774\uB984 \uC77C\uBD80")] string enemy,
+            [Summary("\uB2A5\uB825\uCE58", "\uADFC\uB825, \uBBFC\uCCA9, \uCCB4\uB825, \uC9C0\uB2A5, \uC9C0\uD61C, \uB9E4\uB825 \uC911 \uD558\uB098")] string ability)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                var result = await GoogleSheetService.Instance.Enemies.GetEnemyByIdOrNameAsync(enemy);
+                if (!result.Found)
+                {
+                    if (result.HasMultipleMatches)
+                    {
+                        await FollowupAsync(embed: BuildEnemyCandidateEmbed(result.Matches, enemy), ephemeral: true);
+                        return;
+                    }
+
+                    await FollowupAsync($"\uC5D0\uB108\uBBF8 `{enemy}`\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. `/\uC5D0\uB108\uBBF8\uBAA9\uB85D`\uC73C\uB85C \uB4F1\uB85D \uBAA9\uB85D\uC744 \uBA3C\uC800 \uD655\uC778\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var found = result.Enemy!;
+                var stat = ResolveEnemyStat(found, ability);
+                if (stat is null)
+                {
+                    await FollowupAsync("\uB2A5\uB825\uCE58\uB294 `\uADFC\uB825`, `\uBBFC\uCCA9`, `\uCCB4\uB825`, `\uC9C0\uB2A5`, `\uC9C0\uD61C`, `\uB9E4\uB825` \uB610\uB294 `str`, `dex`, `con`, `int`, `wis`, `cha` \uC911 \uD558\uB098\uB85C \uC785\uB825\uD574\uC8FC\uC138\uC694.", ephemeral: true);
+                    return;
+                }
+
+                var die1 = Random.Shared.Next(1, 7);
+                var die2 = Random.Shared.Next(1, 7);
+                var diceTotal = die1 + die2;
+                var total = diceTotal + stat.Modifier;
+                var outcome = ResolveEnemyOutcome(total);
+
+                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                    "\uC5D0\uB108\uBBF8 \uD310\uC815",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    "",
+                    found.Name,
+                    $"{found.EnemyId} / {stat.Code} {stat.Value} ({FormatModifier(stat.Modifier)}) / {die1}+{die2} => {total} / {outcome.Label}");
+
+                await FollowupAsync(
+                    embed: BuildEnemyRollEmbed(found, stat, die1, die2, diceTotal, total, outcome),
+                    ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
         private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
         {
             await DeferAsync(ephemeral: true);
@@ -575,6 +629,72 @@ namespace PandoraBot.Modules
             return embed.Build();
         }
 
+        private static Embed BuildEnemyRollEmbed(EnemyRow enemy, EnemyStatInfo stat, int die1, int die2, int diceTotal, int total, EnemyJudgementOutcome outcome)
+        {
+            return new EmbedBuilder()
+                .WithTitle("PROJECT:PANDORA | ENEMY ROLL")
+                .WithColor(outcome.Color)
+                .WithDescription($"**{enemy.Name}** \uC5D0\uB108\uBBF8\uC758 **{stat.KoreanName}({stat.Code})** \uD310\uC815\uC785\uB2C8\uB2E4.")
+                .AddField("\uB2A5\uB825\uCE58", $"{stat.KoreanName} `{stat.Value}`", inline: true)
+                .AddField("\uC218\uC815\uCE58", FormatModifier(stat.Modifier), inline: true)
+                .AddField("\uC8FC\uC0AC\uC704", $"`{die1}` + `{die2}` = **{diceTotal}**", inline: true)
+                .AddField("\uCD5C\uC885 \uD569\uACC4", $"**{total}**", inline: true)
+                .AddField("\uACB0\uACFC", outcome.Text, inline: true)
+                .AddField("\uAE30\uC900", "`10+` \uC131\uACF5 / `7-9` \uBD80\uBD84 \uC131\uACF5 / `6-` \uC2E4\uD328", inline: false)
+                .WithFooter("PANDORA NETWORK / ENEMY OPERATION")
+                .WithCurrentTimestamp()
+                .Build();
+        }
+
+        private static EnemyStatInfo? ResolveEnemyStat(EnemyRow enemy, string ability)
+        {
+            var normalized = ability.Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                "\uADFC\uB825" or "str" or "strength" => CreateEnemyStat("STR", "\uADFC\uB825", enemy.Strength),
+                "\uBBFC\uCCA9" or "\uBBFC\uCCA9\uC131" or "dex" or "dexterity" => CreateEnemyStat("DEX", "\uBBFC\uCCA9", enemy.Dexterity),
+                "\uCCB4\uB825" or "con" or "constitution" => CreateEnemyStat("CON", "\uCCB4\uB825", enemy.Constitution),
+                "\uC9C0\uB2A5" or "int" or "intelligence" => CreateEnemyStat("INT", "\uC9C0\uB2A5", enemy.Intelligence),
+                "\uC9C0\uD61C" or "wis" or "wisdom" => CreateEnemyStat("WIS", "\uC9C0\uD61C", enemy.Wisdom),
+                "\uB9E4\uB825" or "cha" or "charisma" => CreateEnemyStat("CHA", "\uB9E4\uB825", enemy.Charisma),
+                _ => null
+            };
+        }
+
+        private static EnemyStatInfo CreateEnemyStat(string code, string koreanName, int value)
+        {
+            return new EnemyStatInfo(code, koreanName, value, GetModifier(value));
+        }
+
+        private static int GetModifier(int statValue)
+        {
+            return statValue switch
+            {
+                >= 18 => 3,
+                >= 16 => 2,
+                >= 13 => 1,
+                >= 9 => 0,
+                >= 6 => -1,
+                >= 4 => -2,
+                _ => -3
+            };
+        }
+
+        private static EnemyJudgementOutcome ResolveEnemyOutcome(int total)
+        {
+            if (total >= 10)
+            {
+                return new EnemyJudgementOutcome("\uC131\uACF5", "**\uC131\uACF5** - \uC758\uB3C4\uD55C \uD589\uB3D9\uC744 \uC548\uC815\uC801\uC73C\uB85C \uD574\uB0C5\uB2C8\uB2E4.", Color.Green);
+            }
+
+            if (total >= 7)
+            {
+                return new EnemyJudgementOutcome("\uBD80\uBD84 \uC131\uACF5", "**\uBD80\uBD84 \uC131\uACF5** - \uC131\uACF5\uD558\uC9C0\uB9CC \uB300\uAC00, \uC120\uD0DD, \uC704\uD5D8\uC774 \uB530\uB77C\uBD99\uC2B5\uB2C8\uB2E4.", Color.Gold);
+            }
+
+            return new EnemyJudgementOutcome("\uC2E4\uD328", "**\uC2E4\uD328** - \uC9C4\uD589\uC790\uAC00 \uC2E4\uD328\uC5D0 \uB530\uB978 \uC0C1\uD669 \uBCC0\uD654\uB97C \uC81C\uC2DC\uD569\uB2C8\uB2E4.", Color.Red);
+        }
+
         private static string FormatEmpty(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "-" : value;
@@ -583,5 +703,9 @@ namespace PandoraBot.Modules
         {
             return modifier >= 0 ? $"+{modifier}" : modifier.ToString();
         }
+
+        private sealed record EnemyStatInfo(string Code, string KoreanName, int Value, int Modifier);
+
+        private sealed record EnemyJudgementOutcome(string Label, string Text, Color Color);
     }
 }
