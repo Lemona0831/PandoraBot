@@ -11,3 +11,15 @@ public sealed record CombatParticipantSummary(
     string Status,
     string Memo,
     DateTimeOffset CreatedAt);
+
+public sealed record CombatParticipantHpResult(
+    Guid CombatSessionId,
+    string ParticipantId,
+    string Type,
+    string SourceId,
+    string DisplayName,
+    int OldHp,
+    int CurrentHp,
+    int MaxHp,
+    string Status,
+    bool CharacterSynced);

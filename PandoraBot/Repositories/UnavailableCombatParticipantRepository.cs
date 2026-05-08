@@ -9,4 +9,7 @@ public sealed class UnavailableCombatParticipantRepository : ICombatParticipantR
 
     public Task<IReadOnlyList<CombatParticipantSummary>> AddEnemiesAsync(string guildId, string channelId, string enemyIdOrName, int quantity, string createdByDiscordId, string memo = "")
         => Task.FromException<IReadOnlyList<CombatParticipantSummary>>(new InvalidOperationException(Message));
+
+    public Task<CombatParticipantHpResult> AdjustHpAsync(string guildId, string channelId, string participantIdOrName, int amount, string action, string actorDiscordId, string memo = "")
+        => Task.FromException<CombatParticipantHpResult>(new InvalidOperationException(Message));
 }

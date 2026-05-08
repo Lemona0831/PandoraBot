@@ -199,6 +199,80 @@ public sealed class DbCombatParticipantRepository : ICombatParticipantRepository
         return participants.Select(Map).ToList();
     }
 
+    public async Task<CombatParticipantHpResult> AdjustHpAsync(
+        string guildId,
+        string channelId,
+        string participantIdOrName,
+        int amount,
+        string action,
+        string actorDiscordId,
+        string memo = "")
+    {
+        if (amount <= 0)
+        {
+            throw new InvalidOperationException("수치는 1 이상이어야 합니다.");
+        }
+
+        var normalizedAction = action.Trim().ToLowerInvariant();
+        if (normalizedAction is not ("damage" or "heal"))
+        {
+            throw new InvalidOperationException("action은 damage 또는 heal이어야 합니다.");
+        }
+
+        await using var db = CreateDb();
+        var session = await GetActiveSessionAsync(db, guildId, channelId);
+        var participant = await FindParticipantAsync(db, session.Id, participantIdOrName);
+
+        var oldHp = participant.CurrentHp;
+        var nextHp = normalizedAction == "heal"
+            ? Math.Clamp(participant.CurrentHp + amount, 0, participant.MaxHp)
+            : Math.Clamp(participant.CurrentHp - amount, 0, participant.MaxHp);
+        var nextStatus = nextHp <= 0 ? "defeated" : "active";
+
+        participant.CurrentHp = nextHp;
+        participant.Status = nextStatus;
+
+        var characterSynced = false;
+        if (string.Equals(participant.Type, "player", StringComparison.OrdinalIgnoreCase) &&
+            Guid.TryParse(participant.SourceId, out var characterId))
+        {
+            var character = await db.Characters.FirstOrDefaultAsync(x => x.Id == characterId);
+            if (character is not null)
+            {
+                character.CurrentHp = nextHp;
+                character.UpdatedAt = DateTimeOffset.UtcNow;
+                characterSynced = true;
+            }
+        }
+
+        db.CombatLogs.Add(new CombatLogEntity
+        {
+            Id = Guid.NewGuid(),
+            CombatSessionId = session.Id,
+            ActorDiscordId = actorDiscordId,
+            ActionType = normalizedAction == "heal" ? "combat_heal" : "combat_damage",
+            TargetName = participant.DisplayName,
+            BeforeValue = oldHp.ToString(),
+            AfterValue = nextHp.ToString(),
+            Message = BuildCombatLogMessage(participant, amount, oldHp, nextHp, memo),
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+
+        return new CombatParticipantHpResult(
+            session.Id,
+            participant.Id.ToString(),
+            participant.Type,
+            participant.SourceId,
+            participant.DisplayName,
+            oldHp,
+            nextHp,
+            participant.MaxHp,
+            nextStatus,
+            characterSynced);
+    }
+
     private PandoraDbContext CreateDb()
         => PandoraDbContextFactory.CreateOrNull(connectionString)
            ?? throw new InvalidOperationException("PandoraDb connection string is not configured.");
@@ -216,6 +290,53 @@ public sealed class DbCombatParticipantRepository : ICombatParticipantRepository
         }
 
         return session;
+    }
+
+    private static async Task<CombatParticipantEntity> FindParticipantAsync(PandoraDbContext db, Guid combatSessionId, string participantIdOrName)
+    {
+        var query = participantIdOrName.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            throw new InvalidOperationException("대상 참가자를 입력해주세요.");
+        }
+
+        if (Guid.TryParse(query, out var participantGuid))
+        {
+            var byId = await db.CombatParticipants.FirstOrDefaultAsync(x => x.CombatSessionId == combatSessionId && x.Id == participantGuid);
+            if (byId is not null)
+            {
+                return byId;
+            }
+        }
+
+        var exactMatches = await db.CombatParticipants
+            .Where(x => x.CombatSessionId == combatSessionId && x.DisplayName == query)
+            .OrderBy(x => x.DisplayName)
+            .ToListAsync();
+        if (exactMatches.Count == 1)
+        {
+            return exactMatches[0];
+        }
+        if (exactMatches.Count > 1)
+        {
+            throw new InvalidOperationException("같은 이름의 전투 참가자가 여러 명입니다. 참가자 ID로 다시 시도해주세요.");
+        }
+
+        var partialMatches = await db.CombatParticipants
+            .Where(x => x.CombatSessionId == combatSessionId && x.DisplayName.Contains(query))
+            .OrderBy(x => x.DisplayName)
+            .Take(5)
+            .ToListAsync();
+        if (partialMatches.Count == 1)
+        {
+            return partialMatches[0];
+        }
+        if (partialMatches.Count > 1)
+        {
+            throw new InvalidOperationException("조건에 맞는 전투 참가자가 여러 명입니다. 참가자 ID 또는 더 정확한 이름으로 다시 시도해주세요.");
+        }
+
+        throw new InvalidOperationException("현재 활성 전투 세션에서 해당 참가자를 찾을 수 없습니다. 먼저 /전투상태로 참가자를 확인해주세요.");
     }
 
     private static string CreateUniqueName(string baseName, HashSet<string> usedNames)
@@ -263,4 +384,10 @@ public sealed class DbCombatParticipantRepository : ICombatParticipantRepository
             entity.Status,
             entity.Memo,
             entity.CreatedAt);
+
+    private static string BuildCombatLogMessage(CombatParticipantEntity participant, int amount, int oldHp, int nextHp, string memo)
+    {
+        var memoText = string.IsNullOrWhiteSpace(memo) ? "" : $" / {memo.Trim()}";
+        return $"{participant.DisplayName} / {participant.Type} / {oldHp} -> {nextHp} / amount {amount}{memoText}";
+    }
 }

@@ -754,13 +754,33 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                var result = await GoogleSheetService.Instance.AdjustActiveParticipantHpAsync(
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("전투 관련 명령은 서버 채널에서만 사용할 수 있습니다.", ephemeral: true);
+                    return;
+                }
+
+                var result = await PandoraRepositoryProvider.CombatParticipants.AdjustHpAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
                     target,
                     amount,
                     action,
                     Context.User.Id.ToString(),
-                    Context.User.Username,
-                    memo);
+                    memo ?? "");
+
+                if (string.Equals(result.Type, "player", StringComparison.OrdinalIgnoreCase))
+                {
+                    var logAction = string.Equals(action, "heal", StringComparison.OrdinalIgnoreCase) ? "전투회복" : "전투피해";
+                    var memoText = string.IsNullOrWhiteSpace(memo) ? "" : $" / {memo.Trim()}";
+                    await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                        logAction,
+                        Context.User.Id.ToString(),
+                        Context.User.Username,
+                        Context.Channel.Id.ToString(),
+                        result.DisplayName,
+                        $"{result.ParticipantId} / {result.Type} / {result.OldHp} -> {result.CurrentHp} / amount {amount}{memoText}");
+                }
 
                 await FollowupAsync(
                     embed: BuildActiveCombatHpEmbed(result, action, amount),
@@ -768,7 +788,8 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("active combat participant", StringComparison.OrdinalIgnoreCase))
+                if (ex.Message.Contains("활성 전투 세션", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("/전투상태", StringComparison.OrdinalIgnoreCase))
                 {
                     await FollowupAsync("\uB300\uC0C1\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. `/전투상태`\uB85C \uD604\uC7AC \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uB97C \uBA3C\uC800 \uD655\uC778\uD574\uC8FC\uC138\uC694.", ephemeral: true);
                     return;
@@ -1150,12 +1171,12 @@ namespace PandoraBot.Modules
             return embed.Build();
         }
 
-        private static Embed BuildActiveCombatHpEmbed(GoogleSheetService.ActiveCombatHpResult result, string action, int amount)
+        private static Embed BuildActiveCombatHpEmbed(CombatParticipantHpResult result, string action, int amount)
         {
             var isHeal = string.Equals(action, "heal", StringComparison.OrdinalIgnoreCase);
             var label = isHeal ? "\uC804\uD22C \uD68C\uBCF5" : "\uC804\uD22C \uD53C\uD574";
             var syncText = string.Equals(result.Type, "player", StringComparison.OrdinalIgnoreCase)
-                ? result.StorageSynced ? "\uCE90\uB9AD\uD130 \uC800\uC7A5\uC18C \uBC18\uC601\uB428" : "\uD65C\uC131 \uCC38\uAC00\uC790\uB9CC \uBC18\uC601\uB428"
+                ? result.CharacterSynced ? "\uCE90\uB9AD\uD130 DB\uC640 \uCC38\uAC00\uC790 HP \uB3D9\uAE30\uD654" : "\uCC38\uAC00\uC790 HP\uB9CC \uBC18\uC601\uB428"
                 : "\uD65C\uC131 \uCC38\uAC00\uC790\uB9CC \uBC18\uC601\uB428";
 
             return new EmbedBuilder()
