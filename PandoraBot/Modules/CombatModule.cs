@@ -52,7 +52,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
                 return;
             }
 
-            await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            await FollowupAsync(ToFriendlyCombatError(ex.Message), ephemeral: true);
         }
     }
 
@@ -82,6 +82,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
 
         embed.AddField("플레이어", BuildAdminParticipantLines(players, includeHp: true), inline: false);
         embed.AddField("에너미", BuildAdminParticipantLines(enemies, includeHp: true), inline: false);
+        AppendOverflowNote(embed, players.Count, enemies.Count);
 
         return embed.Build();
     }
@@ -108,6 +109,8 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
             .WithFooter("PANDORA NETWORK / PLAYER COMBAT BOARD")
             .WithCurrentTimestamp();
 
+        AppendOverflowNote(embed, players.Count, enemies.Count);
+
         return embed.Build();
     }
 
@@ -119,7 +122,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         var builder = new StringBuilder();
-        foreach (var participant in participants)
+        foreach (var participant in participants.Take(15))
         {
             builder.Append("- ")
                 .Append(participant.DisplayName)
@@ -149,7 +152,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         var builder = new StringBuilder();
-        foreach (var participant in participants)
+        foreach (var participant in participants.Take(15))
         {
             builder.Append("- ")
                 .Append(participant.DisplayName)
@@ -173,7 +176,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         var builder = new StringBuilder();
-        foreach (var participant in participants)
+        foreach (var participant in participants.Take(20))
         {
             builder.Append("- ")
                 .Append(participant.DisplayName)
@@ -181,5 +184,34 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    private static void AppendOverflowNote(EmbedBuilder embed, int playerCount, int enemyCount)
+    {
+        if (playerCount <= 15 && enemyCount <= 20)
+        {
+            return;
+        }
+
+        embed.AddField(
+            "표시 제한",
+            $"가독성을 위해 플레이어는 최대 15명, 에너미는 최대 20명까지만 표시합니다. 전체 수: 플레이어 {playerCount}명 / 에너미 {enemyCount}명",
+            inline: false);
+    }
+
+    private static string ToFriendlyCombatError(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "전투 상태를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+        }
+
+        if (message.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("429", StringComparison.OrdinalIgnoreCase))
+        {
+            return "전투 상태 요청이 잠시 몰렸습니다. 몇 초 후 다시 시도해 주세요.";
+        }
+
+        return $"전투 상태를 불러오는 중 문제가 발생했습니다: {message}";
     }
 }

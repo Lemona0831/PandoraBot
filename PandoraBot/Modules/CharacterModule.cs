@@ -12,19 +12,21 @@ namespace PandoraBot.Modules
         public async Task RegisterCharacter(
             [Summary("시트", "캐릭터 원본 시트 이름 또는 Google Sheets URL")] string sourceSheet)
         {
-            await DeferAsync();
+            await DeferAsync(ephemeral: true);
 
             try
             {
                 var result = await GoogleSheetService.Instance.RegisterAsync(sourceSheet, Context.User.Id.ToString());
-                var action = result.WasUpdated ? "갱신" : "등록";
-                var reviewNote = result.WasUpdated ? "" : "\n신규 캐릭터는 진행자 승인 후 선택할 수 있습니다.";
+                var action = result.WasUpdated ? "\uAC31\uC2E0" : "\uB4F1\uB85D";
+                var nextStep = result.WasUpdated
+                    ? "\n\uB2E4\uC74C\uC73C\uB85C /\uAC80\uC218\uC0C1\uD0DC\uB85C \uC2B9\uC778 \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uACE0, \uC2B9\uC778\uB41C \uCE90\uB9AD\uD130\uB77C\uBA74 /\uC120\uD0DD \uD6C4 /\uD604\uC7AC \uB610\uB294 /\uC815\uBCF4\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
+                    : "\n\uC2E0\uADDC \uCE90\uB9AD\uD130\uB294 \uC2B9\uC778 \uC804\uAE4C\uC9C0 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. /\uAC80\uC218\uC0C1\uD0DC\uB85C \uC9C4\uD589 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
 
-                await FollowupAsync($"{Context.User.Mention}님의 캐릭터 `{result.Hunter.CharacterName}` 정보를 {action}했습니다. (row {result.RowNumber}){reviewNote}");
+                await FollowupAsync($"{Context.User.Mention}\uB2D8\uC758 \uCE90\uB9AD\uD130 {result.Hunter.CharacterName} \uC815\uBCF4\uB97C {action}\uD588\uC2B5\uB2C8\uB2E4. (row {result.RowNumber}){nextStep}");
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}");
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -38,14 +40,14 @@ namespace PandoraBot.Modules
             {
                 var result = await GoogleSheetService.Instance.RegisterAsync(sourceSheet, Context.User.Id.ToString());
                 var message = result.WasUpdated
-                    ? $"`{result.Hunter.CharacterName}` 정보를 원본 시트 기준으로 갱신했습니다. (row {result.RowNumber})"
-                    : $"`{result.Hunter.CharacterName}` 정보를 새로 등록했습니다. 진행자 승인 후 사용할 수 있습니다. (row {result.RowNumber})";
+                    ? $"{result.Hunter.CharacterName} \uC815\uBCF4\uB97C \uC6D0\uBCF8 \uC2DC\uD2B8 \uAE30\uC900\uC73C\uB85C \uAC31\uC2E0\uD588\uC2B5\uB2C8\uB2E4. (row {result.RowNumber})\n\uB2E4\uC74C\uC73C\uB85C /\uAC80\uC218\uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uACE0, \uC2B9\uC778\uB41C \uCE90\uB9AD\uD130\uB77C\uBA74 /\uC120\uD0DD \uD6C4 /\uD604\uC7AC \uB610\uB294 /\uC815\uBCF4\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694."
+                    : $"{result.Hunter.CharacterName} \uC815\uBCF4\uB97C \uC0C8\uB85C \uB4F1\uB85D\uD588\uC2B5\uB2C8\uB2E4. \uC9C4\uD589\uC790 \uC2B9\uC778 \uC804\uAE4C\uC9C0\uB294 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. (row {result.RowNumber})\n\uB2E4\uC74C\uC73C\uB85C /\uAC80\uC218\uC0C1\uD0DC\uB85C \uC2B9\uC778 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
 
                 await FollowupAsync(message, ephemeral: true);
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -62,7 +64,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -83,7 +85,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -140,7 +142,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -178,7 +180,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -215,7 +217,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -237,7 +239,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -258,7 +260,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyCharacterError(ex.Message), ephemeral: true);
             }
         }
 
@@ -300,6 +302,38 @@ namespace PandoraBot.Modules
         private static string FormatModifier(int modifier)
         {
             return modifier >= 0 ? $"+{modifier}" : modifier.ToString();
+        }
+
+        private static string ToFriendlyCharacterError(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+            }
+
+            if (message.Contains("등록된 캐릭터가 없습니다", StringComparison.OrdinalIgnoreCase))
+            {
+                return "등록된 캐릭터가 없습니다. 먼저 `/등록`으로 원본 시트를 등록해 주세요.";
+            }
+
+            if (message.Contains("선택된 캐릭터가 없습니다", StringComparison.OrdinalIgnoreCase))
+            {
+                return "현재 선택된 캐릭터가 없습니다. `/목록`으로 보유 캐릭터를 확인한 뒤 `/선택`으로 사용할 캐릭터를 골라 주세요.";
+            }
+
+            if (message.Contains("approved", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("승인", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{message}\n필요하면 `/검수상태`로 승인 여부를 먼저 확인해 주세요.";
+            }
+
+            if (message.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("429", StringComparison.OrdinalIgnoreCase))
+            {
+                return "요청이 너무 빠르게 들어가 잠시 대기 중입니다. 몇 초 후 다시 시도해 주세요.";
+            }
+
+            return $"처리 중 문제가 발생했습니다: {message}";
         }
 
         private sealed record StatInfo(string Code, string KoreanName, int Value, int Modifier);

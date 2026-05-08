@@ -148,7 +148,14 @@ public class Program
 
         if (!result.IsSuccess)
         {
-        Console.WriteLine($"[Interaction Error] {result.ErrorReason}");
+            var reason = result.ErrorReason ?? "(no reason)";
+            Console.WriteLine($"[Interaction Error] {reason}");
+
+            if (reason.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
+                reason.Contains("429", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("[Interaction Hint] Requests are hitting the rate limit. Slow down repeated commands and retry after a short pause.");
+            }
         }
     }
 

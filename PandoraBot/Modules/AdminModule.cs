@@ -31,7 +31,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -48,7 +48,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -76,7 +76,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -119,7 +119,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -153,7 +153,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -193,7 +193,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -227,7 +227,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -284,7 +284,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -321,7 +321,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -356,7 +356,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -410,7 +410,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -488,7 +488,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -551,7 +551,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -616,7 +616,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -649,7 +649,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -687,7 +687,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -733,7 +733,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -771,7 +771,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -813,7 +813,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -888,7 +888,7 @@ namespace PandoraBot.Modules
                     return;
                 }
 
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
         private async Task AdjustHpAsync(string characterName, int amount, string action, string? memo)
@@ -939,7 +939,7 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
@@ -962,10 +962,36 @@ namespace PandoraBot.Modules
             }
             catch (Exception ex)
             {
-                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
             }
         }
 
+        private static string ToFriendlyAdminError(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "\uCC98\uB9AC \uC911 \uBB38\uC81C\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.";
+            }
+
+            if (message.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("429", StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uC694\uCCAD\uC774 \uC7A0\uC2DC \uB9CE\uC544 \uCC98\uB9AC\uAC00 \uC9C0\uC5F0\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4. \uBA87 \uCD08 \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.";
+            }
+
+            if (message.Contains("\uD65C\uC131 \uC804\uD22C \uC138\uC158", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("/\uC804\uD22C\uC2DC\uC791", StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uD604\uC7AC \uCC44\uB110\uC5D0 \uD65C\uC131 \uC804\uD22C \uC138\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 /\uC804\uD22C\uC2DC\uC791\uC73C\uB85C \uC138\uC158\uC744 \uC5F4\uC5B4 \uC8FC\uC138\uC694.";
+            }
+
+            if (message.Contains("\uCC3E\uC744 \uC218 \uC5C6", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{message}\n\uD544\uC694\uD558\uBA74 \uBAA9\uB85D \uBA85\uB839\uC73C\uB85C \uD604\uC7AC \uB4F1\uB85D \uC0C1\uD0DC\uB97C \uBA3C\uC800 \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
+            }
+
+            return $"\uCC98\uB9AC \uC911 \uBB38\uC81C\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: {message}";
+        }
         private static Embed BuildHunterEmbed(Hunter hunter)
         {
             return new EmbedBuilder()
