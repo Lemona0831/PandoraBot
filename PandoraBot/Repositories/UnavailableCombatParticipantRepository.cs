@@ -12,4 +12,13 @@ public sealed class UnavailableCombatParticipantRepository : ICombatParticipantR
 
     public Task<CombatParticipantHpResult> AdjustHpAsync(string guildId, string channelId, string participantIdOrName, int amount, string action, string actorDiscordId, string memo = "")
         => Task.FromException<CombatParticipantHpResult>(new InvalidOperationException(Message));
+
+    public Task<IReadOnlyList<CombatParticipantSummary>> GetParticipantsAsync(string guildId, string channelId)
+        => Task.FromException<IReadOnlyList<CombatParticipantSummary>>(new InvalidOperationException(Message));
+
+    public Task<CombatParticipantSummary> RemoveParticipantAsync(string guildId, string channelId, string participantIdOrName, string actorDiscordId, string memo = "")
+        => Task.FromException<CombatParticipantSummary>(new InvalidOperationException(Message));
+
+    public Task<IReadOnlyList<CombatParticipantSummary>> CleanupDefeatedEnemiesAsync(string guildId, string channelId, string actorDiscordId, string memo = "")
+        => Task.FromException<IReadOnlyList<CombatParticipantSummary>>(new InvalidOperationException(Message));
 }

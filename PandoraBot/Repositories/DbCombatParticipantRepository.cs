@@ -273,6 +273,93 @@ public sealed class DbCombatParticipantRepository : ICombatParticipantRepository
             characterSynced);
     }
 
+    public async Task<IReadOnlyList<CombatParticipantSummary>> GetParticipantsAsync(string guildId, string channelId)
+    {
+        await using var db = CreateDb();
+        var session = await GetActiveSessionAsync(db, guildId, channelId);
+        var participants = await db.CombatParticipants
+            .AsNoTracking()
+            .Where(x => x.CombatSessionId == session.Id)
+            .OrderBy(x => x.Type)
+            .ThenBy(x => x.DisplayName)
+            .ToListAsync();
+
+        return participants.Select(Map).ToList();
+    }
+
+    public async Task<CombatParticipantSummary> RemoveParticipantAsync(
+        string guildId,
+        string channelId,
+        string participantIdOrName,
+        string actorDiscordId,
+        string memo = "")
+    {
+        await using var db = CreateDb();
+        var session = await GetActiveSessionAsync(db, guildId, channelId);
+        var participant = await FindParticipantAsync(db, session.Id, participantIdOrName);
+        var summary = Map(participant);
+
+        db.CombatLogs.Add(new CombatLogEntity
+        {
+            Id = Guid.NewGuid(),
+            CombatSessionId = session.Id,
+            ActorDiscordId = actorDiscordId,
+            ActionType = "combat_remove",
+            TargetName = participant.DisplayName,
+            BeforeValue = participant.Status,
+            AfterValue = "removed",
+            Message = BuildRemovalLogMessage(participant, memo),
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.CombatParticipants.Remove(participant);
+        await db.SaveChangesAsync();
+        return summary;
+    }
+
+    public async Task<IReadOnlyList<CombatParticipantSummary>> CleanupDefeatedEnemiesAsync(
+        string guildId,
+        string channelId,
+        string actorDiscordId,
+        string memo = "")
+    {
+        await using var db = CreateDb();
+        var session = await GetActiveSessionAsync(db, guildId, channelId);
+        var targets = await db.CombatParticipants
+            .Where(x =>
+                x.CombatSessionId == session.Id &&
+                x.Type == "enemy" &&
+                (x.CurrentHp <= 0 || x.Status == "defeated"))
+            .OrderBy(x => x.DisplayName)
+            .ToListAsync();
+
+        var removed = targets.Select(Map).ToList();
+        if (targets.Count == 0)
+        {
+            return removed;
+        }
+
+        foreach (var participant in targets)
+        {
+            db.CombatLogs.Add(new CombatLogEntity
+            {
+                Id = Guid.NewGuid(),
+                CombatSessionId = session.Id,
+                ActorDiscordId = actorDiscordId,
+                ActionType = "combat_cleanup",
+                TargetName = participant.DisplayName,
+                BeforeValue = participant.Status,
+                AfterValue = "removed",
+                Message = BuildRemovalLogMessage(participant, memo),
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+        }
+
+        db.CombatParticipants.RemoveRange(targets);
+        await db.SaveChangesAsync();
+        return removed;
+    }
+
     private PandoraDbContext CreateDb()
         => PandoraDbContextFactory.CreateOrNull(connectionString)
            ?? throw new InvalidOperationException("PandoraDb connection string is not configured.");
@@ -389,5 +476,11 @@ public sealed class DbCombatParticipantRepository : ICombatParticipantRepository
     {
         var memoText = string.IsNullOrWhiteSpace(memo) ? "" : $" / {memo.Trim()}";
         return $"{participant.DisplayName} / {participant.Type} / {oldHp} -> {nextHp} / amount {amount}{memoText}";
+    }
+
+    private static string BuildRemovalLogMessage(CombatParticipantEntity participant, string memo)
+    {
+        var memoText = string.IsNullOrWhiteSpace(memo) ? "" : $" / {memo.Trim()}";
+        return $"{participant.DisplayName} / {participant.Type} / removed{memoText}";
     }
 }

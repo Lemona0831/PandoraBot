@@ -724,6 +724,86 @@ namespace PandoraBot.Modules
             }
         }
 
+        [SlashCommand("전투퇴장", "관리자용: 현재 활성 전투 세션에서 특정 참가자를 제거합니다.")]
+        public async Task RemoveCombatParticipant(
+            [Summary("대상", "참가자 ID 또는 표시명")] string target,
+            [Summary("메모", "선택 사항: 제거 메모")] string? memo = null)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("전투 관련 명령은 서버 채널에서만 사용할 수 있습니다.", ephemeral: true);
+                    return;
+                }
+
+                var participant = await PandoraRepositoryProvider.CombatParticipants.RemoveParticipantAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
+                    target,
+                    Context.User.Id.ToString(),
+                    memo ?? "");
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "전투퇴장",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    participant.DisplayName,
+                    $"{participant.Id} / {participant.Type} / removed");
+
+                await FollowupAsync(embed: BuildCombatParticipantRemovedEmbed(participant), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
+        [SlashCommand("전투정리", "관리자용: 현재 활성 전투 세션에서 HP 0 이하 enemy를 정리합니다.")]
+        public async Task CleanupCombatEnemies(
+            [Summary("메모", "선택 사항: 정리 메모")] string? memo = null)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("전투 관련 명령은 서버 채널에서만 사용할 수 있습니다.", ephemeral: true);
+                    return;
+                }
+
+                var removed = await PandoraRepositoryProvider.CombatParticipants.CleanupDefeatedEnemiesAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
+                    Context.User.Id.ToString(),
+                    memo ?? "");
+
+                if (removed.Count == 0)
+                {
+                    await FollowupAsync("정리할 defeated enemy가 없습니다. 플레이어는 자동 제거하지 않습니다.", ephemeral: true);
+                    return;
+                }
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "전투정리",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    "enemy-cleanup",
+                    $"{removed.Count}명 / {string.Join(", ", removed.Select(x => x.DisplayName))}");
+
+                await FollowupAsync(embed: BuildCombatCleanupEmbed(removed), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
         [SlashCommand("\uC804\uD22C\uD53C\uD574", "\uAD00\uB9AC\uC790\uC6A9: \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uC5D0\uAC8C \uD53C\uD574\uB97C \uC801\uC6A9\uD569\uB2C8\uB2E4.")]
         public async Task DamageActiveCombatParticipant(
             [Summary("\uB300\uC0C1", "\uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790 ID \uB610\uB294 \uC774\uB984")] string target,
@@ -1169,6 +1249,39 @@ namespace PandoraBot.Modules
             }
 
             return embed.Build();
+        }
+
+        private static Embed BuildCombatParticipantRemovedEmbed(CombatParticipantSummary participant)
+        {
+            return new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | COMBAT PARTICIPANT REMOVED")
+                .WithColor(new Color(255, 120, 90))
+                .WithDescription($"**{participant.DisplayName}**")
+                .AddField("참가자 ID", participant.Id.ToString(), inline: false)
+                .AddField("구분", participant.Type, inline: true)
+                .AddField("마지막 HP", $"{participant.CurrentHp} / {participant.MaxHp}", inline: true)
+                .AddField("상태", participant.Status, inline: true)
+                .WithFooter("PANDORA NETWORK / COMBAT PARTICIPANT")
+                .WithCurrentTimestamp()
+                .Build();
+        }
+
+        private static Embed BuildCombatCleanupEmbed(IReadOnlyList<CombatParticipantSummary> removed)
+        {
+            var builder = new StringBuilder();
+            foreach (var participant in removed)
+            {
+                builder.AppendLine($"- {participant.DisplayName} (`{participant.CurrentHp}/{participant.MaxHp}`)");
+            }
+
+            return new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | COMBAT CLEANUP")
+                .WithColor(new Color(255, 140, 90))
+                .WithDescription($"defeated enemy {removed.Count}명을 정리했습니다.")
+                .AddField("정리 대상", builder.ToString().TrimEnd(), inline: false)
+                .WithFooter("PANDORA NETWORK / COMBAT CLEANUP")
+                .WithCurrentTimestamp()
+                .Build();
         }
 
         private static Embed BuildActiveCombatHpEmbed(CombatParticipantHpResult result, string action, int amount)
