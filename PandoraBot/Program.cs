@@ -50,10 +50,11 @@ public class Program
         client.Ready += Ready;
         client.InteractionCreated += HandleInteractionAsync;
 
+        var pandoraConnectionString = configuration.GetConnectionString("PandoraDb");
         pandoraDb = CreatePandoraDbContext(configuration);
         var sheetsService = CreateSheetsService();
-        GoogleSheetService.Initialize(sheetsService);
-        PandoraRepositoryProvider.Initialize(configuration.GetConnectionString("PandoraDb"));
+        GoogleSheetService.Initialize(sheetsService, pandoraConnectionString);
+        PandoraRepositoryProvider.Initialize(pandoraConnectionString);
         await interactions.AddModulesAsync(Assembly.GetEntryAssembly(), services: null);
 
         if (string.IsNullOrWhiteSpace(settings.DiscordToken))

@@ -8,4 +8,5 @@ public interface IDropRepository
     Task<IReadOnlyList<EnemyDropSettingRow>> GetEnemyDropSettingsAsync();
     Task<DropRollResult> RollDropAsync(string enemyId, bool writeLog = true);
     Task<DropTestResult> TestDropAsync(string enemyId);
+    Task<EnemyDropRow> CreateDropAsync(EnemyDropCreateInput input);
 }

@@ -1,6 +1,8 @@
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
+using Microsoft.EntityFrameworkCore;
 using PandoraBot.Models;
+using PandoraShared.Data;
 using PandoraShared.Services;
 using System.Text.RegularExpressions;
 
@@ -25,15 +27,17 @@ namespace PandoraBot.Services
 
         private readonly SheetsService service;
         private readonly string storageSpreadsheetId;
+        private readonly string? pandoraDbConnectionString;
         private bool operationalSheetsChecked;
 
         public EnemyService Enemies { get; }
         public DropService Drops { get; }
 
-        private GoogleSheetService(SheetsService service, string storageSpreadsheetId)
+        private GoogleSheetService(SheetsService service, string storageSpreadsheetId, string? pandoraDbConnectionString)
         {
             this.service = service;
             this.storageSpreadsheetId = storageSpreadsheetId;
+            this.pandoraDbConnectionString = pandoraDbConnectionString;
             Enemies = new EnemyService(service, storageSpreadsheetId);
             Drops = new DropService(service, storageSpreadsheetId, Enemies);
         }
@@ -41,7 +45,7 @@ namespace PandoraBot.Services
         public static GoogleSheetService Instance =>
             instance ?? throw new InvalidOperationException("GoogleSheetService has not been initialized.");
 
-        public static GoogleSheetService Initialize(SheetsService service)
+        public static GoogleSheetService Initialize(SheetsService service, string? pandoraDbConnectionString = null)
         {
             lock (InstanceLock)
             {
@@ -50,7 +54,7 @@ namespace PandoraBot.Services
                     var spreadsheetId = Environment.GetEnvironmentVariable("PANDORA_SPREADSHEET_ID")
                         ?? "13DKG_V3TD5GHxQrVpmFGQhFluPvGc3E_M5FXfdvRkqI";
 
-                    instance = new GoogleSheetService(service, spreadsheetId);
+                    instance = new GoogleSheetService(service, spreadsheetId, pandoraDbConnectionString);
                 }
 
                 return instance;
@@ -72,6 +76,7 @@ namespace PandoraBot.Services
                 }
 
                 var hunter = await LoadHunterFromSourceAsync(source, userId);
+                await UpsertCharacterDbAsync(hunter, source);
                 var result = await UpsertStorageAsync(hunter, source);
                 return result;
             }
@@ -946,8 +951,14 @@ namespace PandoraBot.Services
         private async Task<RegistrationResult> UpsertStorageAsync(Hunter hunter, SheetReference source)
         {
             var rows = await ReadStorageRowsAsync();
+            var selections = await ReadSelectionRowsAsync();
             var matches = rows
-                .Where(row => row.UserId == hunter.UserId && Normalize(row.CharacterName) == Normalize(hunter.CharacterName))
+                .Where(row =>
+                    row.UserId == hunter.UserId &&
+                    (
+                        (!string.IsNullOrWhiteSpace(row.SourceSpreadsheetId) && row.SourceSpreadsheetId == source.SpreadsheetId) ||
+                        Normalize(row.CharacterName) == Normalize(hunter.CharacterName)
+                    ))
                 .ToList();
 
             var rowNumber = matches.FirstOrDefault()?.RowNumber ?? await GetNextStorageRowAsync();
@@ -965,8 +976,65 @@ namespace PandoraBot.Services
                 await ClearStorageRowAsync(duplicate.RowNumber);
             }
 
+            var selection = selections.FirstOrDefault(row => row.UserId == hunter.UserId);
+            if (selection != null && matches.Any(row => Normalize(row.CharacterName) == Normalize(selection.CharacterName)))
+            {
+                await UpsertSelectionRowAsync(hunter.UserId, hunter.CharacterName);
+            }
+
             Console.WriteLine($"[Success] {hunter.CharacterName} {(wasUpdated ? "updated" : "saved")} at row {rowNumber}.");
             return new RegistrationResult(hunter, wasUpdated, rowNumber);
+        }
+
+        private async Task UpsertCharacterDbAsync(Hunter hunter, SheetReference source)
+        {
+            var db = PandoraDbContextFactory.CreateOrNull(pandoraDbConnectionString);
+            if (db is null)
+            {
+                return;
+            }
+
+            await using (db)
+            {
+                var existing = await db.Characters.FirstOrDefaultAsync(row =>
+                    row.DiscordUserId == hunter.UserId &&
+                    row.SourceSheetId == source.SpreadsheetId);
+
+                var now = DateTimeOffset.UtcNow;
+                if (existing is null)
+                {
+                    existing = new CharacterEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        DiscordUserId = hunter.UserId,
+                        SourceSheetId = source.SpreadsheetId,
+                        CreatedAt = now,
+                        ReviewStatus = ReviewPending
+                    };
+
+                    db.Characters.Add(existing);
+                }
+
+                existing.SourceSheetUrl = source.SourceSheetUrl;
+                existing.SourceDocumentTitle = source.SourceDocumentTitle;
+                existing.ImportedCharacterName = hunter.CharacterName;
+                existing.DisplayName = hunter.CharacterName;
+                existing.NormalizedDisplayName = NormalizeForDb(hunter.CharacterName);
+                existing.Strength = hunter.Strength;
+                existing.Dexterity = hunter.Dexterity;
+                existing.Constitution = hunter.Constitution;
+                existing.Intelligence = hunter.Intelligence;
+                existing.Wisdom = hunter.Wisdom;
+                existing.Charisma = hunter.Charisma;
+                existing.CurrentHp = Math.Clamp(hunter.CurrentHp, 0, Math.Max(hunter.MaxHp, 1));
+                existing.MaxHp = Math.Max(hunter.MaxHp, 1);
+                existing.ReviewStatus = string.IsNullOrWhiteSpace(existing.ReviewStatus)
+                    ? ReviewPending
+                    : NormalizeReviewStatus(existing.ReviewStatus);
+                existing.UpdatedAt = now;
+
+                await db.SaveChangesAsync();
+            }
         }
 
         private async Task<List<StorageRow>> ReadStorageRowsAsync()
@@ -1391,20 +1459,31 @@ namespace PandoraBot.Services
             var match = Regex.Match(trimmed, @"/spreadsheets/d/([^/?#]+)", RegexOptions.IgnoreCase);
             if (!match.Success)
             {
-                return new SheetReference(storageSpreadsheetId, trimmed);
+                var localMetadata = await service.Spreadsheets.Get(storageSpreadsheetId).ExecuteAsync();
+                var localDocumentTitle = localMetadata.Properties?.Title ?? trimmed;
+                return new SheetReference(
+                    storageSpreadsheetId,
+                    trimmed,
+                    localDocumentTitle,
+                    $"https://docs.google.com/spreadsheets/d/{storageSpreadsheetId}/edit");
             }
 
             var sourceSpreadsheetId = match.Groups[1].Value;
             var gid = ExtractGid(trimmed);
             var metadata = await service.Spreadsheets.Get(sourceSpreadsheetId).ExecuteAsync();
             var sheets = metadata.Sheets ?? new List<Sheet>();
+            var documentTitle = metadata.Properties?.Title ?? sourceSpreadsheetId;
 
             if (gid.HasValue)
             {
                 var matchedSheet = sheets.FirstOrDefault(sheet => sheet.Properties?.SheetId == gid.Value);
                 if (matchedSheet?.Properties?.Title != null)
                 {
-                    return new SheetReference(sourceSpreadsheetId, matchedSheet.Properties.Title);
+                    return new SheetReference(
+                        sourceSpreadsheetId,
+                        matchedSheet.Properties.Title,
+                        documentTitle,
+                        trimmed);
                 }
 
                 throw new Exception($"No sheet tab found for gid={gid.Value}.");
@@ -1416,7 +1495,11 @@ namespace PandoraBot.Services
                 throw new Exception("No sheet tab was found in the linked spreadsheet.");
             }
 
-            return new SheetReference(sourceSpreadsheetId, firstSheetName);
+            return new SheetReference(
+                sourceSpreadsheetId,
+                firstSheetName,
+                documentTitle,
+                trimmed);
         }
 
         private static int ParseInt(IList<object> values, int index, string fieldName)
@@ -1447,6 +1530,11 @@ namespace PandoraBot.Services
         private static string Normalize(string value)
         {
             return value.Trim().ToUpperInvariant();
+        }
+
+        private static string NormalizeForDb(string value)
+        {
+            return value.Trim().ToLowerInvariant();
         }
 
         private static bool IsSelected(StorageRow row, string? selectedCharacterName)
@@ -1596,7 +1684,7 @@ namespace PandoraBot.Services
 
         public sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
 
-        private sealed record SheetReference(string SpreadsheetId, string SheetName);
+        private sealed record SheetReference(string SpreadsheetId, string SheetName, string SourceDocumentTitle, string SourceSheetUrl);
 
         private sealed record SelectionRow(int RowNumber, string UserId, string CharacterName, string SelectedAt);
 

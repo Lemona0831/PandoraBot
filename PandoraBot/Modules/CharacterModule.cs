@@ -1,6 +1,7 @@
 using Discord;
 using Discord.Interactions;
 using PandoraBot.Models;
+using PandoraBot.Repositories;
 using PandoraBot.Services;
 using System.Text;
 
@@ -111,19 +112,15 @@ namespace PandoraBot.Modules
                 var total = diceTotal + stat.Modifier;
                 var outcome = ResolveOutcome(total);
 
-                await GoogleSheetService.Instance.AppendJudgementLogAsync(new GoogleSheetService.JudgementLogEntry(
-                    Context.Guild?.Id.ToString() ?? "",
-                    Context.Channel.Id.ToString(),
-                    Context.User.Id.ToString(),
-                    Context.User.Username,
-                    hunter.CharacterName,
-                    stat.Code,
-                    stat.KoreanName,
-                    die1,
-                    die2,
-                    stat.Modifier,
-                    total,
-                    outcome.Label));
+                await PandoraRepositoryProvider.Logs.AppendRollLogAsync(
+                    characterId: null,
+                    characterDisplayName: hunter.CharacterName,
+                    statName: stat.Code,
+                    dice1: die1,
+                    dice2: die2,
+                    modifier: stat.Modifier,
+                    total: total,
+                    resultTier: outcome.Label);
 
                 var embed = new EmbedBuilder()
                     .WithTitle("PROJECT:PANDORA | 판정 결과")

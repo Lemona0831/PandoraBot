@@ -82,6 +82,58 @@ internal static class RepositoryMemoParser
         return new DropMemoParts(weight, rarity, tag, string.Join("; ", memoParts).Trim());
     }
 
+    public static string ComposeEnemyMemo(string category, string damageFormula, int dp, string description)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            parts.Add($"category={category.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(damageFormula))
+        {
+            parts.Add($"damage_formula={damageFormula.Trim()}");
+        }
+
+        if (dp > 0)
+        {
+            parts.Add($"dp={dp}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            parts.Add(description.Trim());
+        }
+
+        return string.Join("; ", parts);
+    }
+
+    public static string ComposeDropMemo(int weight, string rarity, string tag, string memo)
+    {
+        var parts = new List<string>();
+        if (weight > 0)
+        {
+            parts.Add($"weight={weight}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(rarity))
+        {
+            parts.Add($"rarity={rarity.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            parts.Add($"tag={tag.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(memo))
+        {
+            parts.Add(memo.Trim());
+        }
+
+        return string.Join("; ", parts);
+    }
+
     private static bool TryReadKeyValue(string segment, string key, out string value)
     {
         value = "";

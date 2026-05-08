@@ -2,9 +2,10 @@ namespace PandoraBot.Repositories;
 
 public static class PandoraRepositoryProvider
 {
-    public static IEnemyRepository Enemies { get; private set; } = new SheetEnemyRepository();
-    public static IDropRepository Drops { get; private set; } = new SheetDropRepository();
-    public static IAdminLogRepository AdminLogs { get; private set; } = new SheetAdminLogRepository();
+    public static IEnemyRepository Enemies { get; private set; } = new UnavailableEnemyRepository();
+    public static IDropRepository Drops { get; private set; } = new UnavailableDropRepository();
+    public static IAdminLogRepository AdminLogs { get; private set; } = new UnavailableAdminLogRepository();
+    public static ILogRepository Logs { get; private set; } = new UnavailableLogRepository();
     public static ICombatSessionRepository CombatSessions { get; private set; } = new UnavailableCombatSessionRepository();
     public static ICombatParticipantRepository CombatParticipants { get; private set; } = new UnavailableCombatParticipantRepository();
 
@@ -12,9 +13,10 @@ public static class PandoraRepositoryProvider
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            Enemies = new SheetEnemyRepository();
-            Drops = new SheetDropRepository();
-            AdminLogs = new SheetAdminLogRepository();
+            Enemies = new UnavailableEnemyRepository();
+            Drops = new UnavailableDropRepository();
+            AdminLogs = new UnavailableAdminLogRepository();
+            Logs = new UnavailableLogRepository();
             CombatSessions = new UnavailableCombatSessionRepository();
             CombatParticipants = new UnavailableCombatParticipantRepository();
             return;
@@ -23,6 +25,7 @@ public static class PandoraRepositoryProvider
         Enemies = new DbEnemyRepository(connectionString);
         Drops = new DbDropRepository(connectionString);
         AdminLogs = new DbAdminLogRepository(connectionString);
+        Logs = new DbLogRepository(connectionString);
         CombatSessions = new DbCombatSessionRepository(connectionString);
         CombatParticipants = new DbCombatParticipantRepository(connectionString);
     }

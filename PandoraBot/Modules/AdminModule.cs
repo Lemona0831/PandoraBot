@@ -1,4 +1,4 @@
-using Discord;
+﻿using Discord;
 using Discord.Interactions;
 using PandoraBot.Models;
 using PandoraBot.Repositories;
@@ -62,7 +62,7 @@ namespace PandoraBot.Modules
             try
             {
                 var result = await GoogleSheetService.Instance.SetCharacterHpAsync(characterName, currentHp);
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "HP설정",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -107,7 +107,7 @@ namespace PandoraBot.Modules
             try
             {
                 var result = await GoogleSheetService.Instance.ClearSelectedCharacterForAdminAsync(characterName);
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "선택해제",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -141,7 +141,7 @@ namespace PandoraBot.Modules
                 }
 
                 var result = await GoogleSheetService.Instance.DeleteCharacterForAdminAsync(characterName);
-                await GoogleSheetService.Instance.AppendAdminLogAsync(
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
                     "삭제",
                     Context.User.Id.ToString(),
                     Context.User.Username,
@@ -197,40 +197,6 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("관리판정로그", "관리자용: 최근 판정 로그를 조회합니다.")]
-        public async Task ListJudgementLogs(
-            [Summary("개수", "1~30 사이 조회 개수")] int limit = 10)
-        {
-            await DeferAsync(ephemeral: true);
-
-            try
-            {
-                var logs = await GoogleSheetService.Instance.ListRecentJudgementLogsAsync(limit);
-                if (logs.Count == 0)
-                {
-                    await FollowupAsync("판정 로그가 없습니다.", ephemeral: true);
-                    return;
-                }
-
-                var builder = new StringBuilder();
-                builder.AppendLine("```text");
-                builder.AppendLine("PANDORA ADMIN / RECENT CHECKS");
-                builder.AppendLine("--------------------------------");
-
-                foreach (var log in logs)
-                {
-                    builder.AppendLine($"{log.CreatedAt} | {log.Username} / {log.CharacterName} | {log.StatCode} {log.Total} | {log.Outcome}");
-                }
-
-                builder.Append("```");
-                await FollowupAsync(builder.ToString(), ephemeral: true);
-            }
-            catch (Exception ex)
-            {
-                await FollowupAsync(ToFriendlyAdminError(ex.Message), ephemeral: true);
-            }
-        }
-
         [SlashCommand("공지", "관리자용: 공지 템플릿을 발송하고 기록합니다.")]
         public async Task SendNotice(
             [Summary("종류", "세션, 모집, 점검, 안내 등")] string noticeType,
@@ -271,13 +237,13 @@ namespace PandoraBot.Modules
                     .WithCurrentTimestamp()
                     .Build();
 
-                await GoogleSheetService.Instance.AppendNoticeLogAsync(
-                    noticeType,
-                    title,
-                    $"{content}\nMENTION: {(mentions.Count == 0 ? "none" : string.Join(" ", mentions))}",
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    $"notice:{noticeType}",
                     Context.User.Id.ToString(),
                     Context.User.Username,
-                    Context.Channel.Id.ToString());
+                    Context.Channel.Id.ToString(),
+                    title,
+                    $"{content}\nMENTION: {(mentions.Count == 0 ? "none" : string.Join(" ", mentions))}");
 
                 var mentionText = mentions.Count == 0 ? null : string.Join(" ", mentions);
                 await FollowupAsync(mentionText, embed: embed);
@@ -1421,3 +1387,6 @@ namespace PandoraBot.Modules
         private sealed record DropSummaryItem(string ItemName, int Count);
     }
 }
+
+
+

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PandoraShared.Data;
 using PandoraShared.Models;
 
@@ -47,29 +47,52 @@ public sealed class DbDropRepository : IDropRepository
         return new DropTestResult(result.Message, result);
     }
 
+    public async Task<EnemyDropRow> CreateDropAsync(EnemyDropCreateInput input)
+    {
+        await using var db = CreateDb();
+        var enemy = await db.Enemies.FirstOrDefaultAsync(x => x.EnemyCode == input.EnemyId);
+        if (enemy is null)
+        {
+            throw new InvalidOperationException("드롭을 추가할 에너미를 찾을 수 없습니다.");
+        }
+
+        var exists = await db.EnemyDrops.AnyAsync(x => x.EnemyId == enemy.Id && x.ItemName == input.ItemName);
+        if (exists)
+        {
+            throw new InvalidOperationException("같은 에너미에 동일한 드롭 아이템이 이미 등록되어 있습니다.");
+        }
+
+        var entity = new EnemyDropEntity
+        {
+            Id = Guid.NewGuid(),
+            EnemyId = enemy.Id,
+            ItemName = input.ItemName.Trim(),
+            Probability = Math.Clamp(input.Chance, 0, 100) / 100m,
+            MinQuantity = Math.Max(1, input.MinCount),
+            MaxQuantity = Math.Max(Math.Max(1, input.MinCount), input.MaxCount),
+            Memo = RepositoryMemoParser.ComposeDropMemo(input.Weight, input.Rarity, input.Tag, input.Memo)
+        };
+
+        db.EnemyDrops.Add(entity);
+        await db.SaveChangesAsync();
+        entity.Enemy = enemy;
+        return MapDrop(entity);
+    }
+
     private async Task<DropRollResult> RollDropCoreAsync(string enemyCode)
     {
         await using var db = CreateDb();
-        var enemy = await db.Enemies
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.EnemyCode == enemyCode);
-
+        var enemy = await db.Enemies.AsNoTracking().FirstOrDefaultAsync(x => x.EnemyCode == enemyCode);
         if (enemy is null)
         {
             throw new InvalidOperationException("선택한 에너미를 찾을 수 없습니다.");
         }
 
-        var drops = await db.EnemyDrops
-            .AsNoTracking()
-            .Where(x => x.EnemyId == enemy.Id)
-            .ToListAsync();
-
-        var setting = await db.EnemyDropSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.EnemyId == enemy.Id);
+        var drops = await db.EnemyDrops.AsNoTracking().Where(x => x.EnemyId == enemy.Id).ToListAsync();
+        var setting = await db.EnemyDropSettings.AsNoTracking().FirstOrDefaultAsync(x => x.EnemyId == enemy.Id);
 
         var settingRow = setting is null
-            ? new EnemyDropSettingRow(0, enemy.EnemyCode, 100, 1, false, "")
+            ? new EnemyDropSettingRow(0, enemy.EnemyCode, 100, 1, false, string.Empty)
             : MapSetting(setting, enemy.EnemyCode);
 
         if (drops.Count == 0)
@@ -107,7 +130,7 @@ public sealed class DbDropRepository : IDropRepository
         }
 
         var message = results.Count == 0
-            ? $"{enemy.Name}: 전리품 발생에는 성공했지만 개별 전리품이 통과하지 못했습니다."
+            ? $"{enemy.Name}: 전리품 발생에는 성공했지만 개별 아이템이 통과하지 못했습니다."
             : $"{enemy.Name}: {string.Join(", ", results.Select(item => $"{item.ItemName} x{item.Count}"))}";
 
         return new DropRollResult(enemy.EnemyCode, enemy.Name, true, occurRoll, settingRow.DropRate, results, message);
@@ -122,7 +145,7 @@ public sealed class DbDropRepository : IDropRepository
         var memo = RepositoryMemoParser.ParseDropMemo(entity.Memo);
         return new EnemyDropRow(
             RowNumber: 0,
-            EnemyId: entity.Enemy?.EnemyCode ?? "",
+            EnemyId: entity.Enemy?.EnemyCode ?? string.Empty,
             ItemName: entity.ItemName,
             Chance: ToPercent(entity.Probability),
             MinCount: Math.Max(1, entity.MinQuantity),
@@ -134,7 +157,7 @@ public sealed class DbDropRepository : IDropRepository
     }
 
     private static EnemyDropSettingRow MapSetting(EnemyDropSettingEntity entity)
-        => MapSetting(entity, entity.Enemy?.EnemyCode ?? "");
+        => MapSetting(entity, entity.Enemy?.EnemyCode ?? string.Empty);
 
     private static EnemyDropSettingRow MapSetting(EnemyDropSettingEntity entity, string enemyCode)
     {

@@ -16,4 +16,7 @@ public sealed class SheetDropRepository : IDropRepository
 
     public Task<DropTestResult> TestDropAsync(string enemyId)
         => GoogleSheetService.Instance.Drops.TestDropAsync(enemyId);
+
+    public Task<EnemyDropRow> CreateDropAsync(EnemyDropCreateInput input)
+        => throw new InvalidOperationException("드롭 아이템 추가는 PostgreSQL 모드에서만 지원합니다.");
 }
