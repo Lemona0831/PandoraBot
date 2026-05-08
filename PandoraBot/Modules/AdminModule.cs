@@ -640,6 +640,90 @@ namespace PandoraBot.Modules
             }
         }
 
+        [SlashCommand("전투참가", "관리자용: 현재 활성 전투 세션에 플레이어 캐릭터를 참가시킵니다.")]
+        public async Task JoinCombatSession(
+            [Summary("캐릭터", "참가시킬 캐릭터 이름")] string characterName,
+            [Summary("메모", "선택 사항: 참가 메모")] string? memo = null)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("전투 관련 명령은 서버 채널에서만 사용할 수 있습니다.", ephemeral: true);
+                    return;
+                }
+
+                var participant = await PandoraRepositoryProvider.CombatParticipants.AddPlayerAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
+                    characterName,
+                    Context.User.Id.ToString(),
+                    memo ?? "");
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "전투참가",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    participant.DisplayName,
+                    $"{participant.Id} / player / hp={participant.CurrentHp}/{participant.MaxHp}");
+
+                await FollowupAsync(embed: BuildCombatParticipantAddedEmbed(participant, "플레이어 참가"), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
+        [SlashCommand("에너미소환", "관리자용: 현재 활성 전투 세션에 에너미를 소환합니다.")]
+        public async Task SpawnEnemies(
+            [Summary("에너미", "에너미 ID 또는 이름")] string enemy,
+            [Summary("수량", "소환할 수량")] int quantity = 1,
+            [Summary("메모", "선택 사항: 소환 메모")] string? memo = null)
+        {
+            await DeferAsync(ephemeral: true);
+
+            try
+            {
+                if (Context.Guild is null)
+                {
+                    await FollowupAsync("전투 관련 명령은 서버 채널에서만 사용할 수 있습니다.", ephemeral: true);
+                    return;
+                }
+
+                if (quantity <= 0)
+                {
+                    await FollowupAsync("수량은 1 이상으로 입력해주세요.", ephemeral: true);
+                    return;
+                }
+
+                var participants = await PandoraRepositoryProvider.CombatParticipants.AddEnemiesAsync(
+                    Context.Guild.Id.ToString(),
+                    Context.Channel.Id.ToString(),
+                    enemy,
+                    Math.Clamp(quantity, 1, 26),
+                    Context.User.Id.ToString(),
+                    memo ?? "");
+
+                await PandoraRepositoryProvider.AdminLogs.AppendAdminLogAsync(
+                    "에너미소환",
+                    Context.User.Id.ToString(),
+                    Context.User.Username,
+                    Context.Channel.Id.ToString(),
+                    enemy,
+                    $"{participants.Count}명 / {string.Join(", ", participants.Select(x => x.DisplayName))}");
+
+                await FollowupAsync(embed: BuildCombatEnemySpawnedEmbed(enemy, quantity, participants), ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"Error: {ex.Message}", ephemeral: true);
+            }
+        }
+
         [SlashCommand("\uC804\uD22C\uD53C\uD574", "\uAD00\uB9AC\uC790\uC6A9: \uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790\uC5D0\uAC8C \uD53C\uD574\uB97C \uC801\uC6A9\uD569\uB2C8\uB2E4.")]
         public async Task DamageActiveCombatParticipant(
             [Summary("\uB300\uC0C1", "\uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790 ID \uB610\uB294 \uC774\uB984")] string target,
@@ -1023,6 +1107,47 @@ namespace PandoraBot.Modules
                 .AddField("종료 시각", $"<t:{endedAt.ToUnixTimeSeconds()}:f>", inline: false)
                 .WithFooter("PANDORA NETWORK / COMBAT SESSION")
                 .Build();
+        }
+
+        private static Embed BuildCombatParticipantAddedEmbed(CombatParticipantSummary participant, string actionTitle)
+        {
+            return new EmbedBuilder()
+                .WithTitle($"PANDORA ADMIN | {actionTitle}")
+                .WithColor(new Color(90, 190, 255))
+                .WithDescription($"**{participant.DisplayName}**")
+                .AddField("참가자 ID", participant.Id.ToString(), inline: false)
+                .AddField("구분", participant.Type, inline: true)
+                .AddField("상태", participant.Status, inline: true)
+                .AddField("HP", $"{participant.CurrentHp} / {participant.MaxHp}", inline: true)
+                .AddField("세션 ID", participant.CombatSessionId.ToString(), inline: false)
+                .WithFooter("PANDORA NETWORK / COMBAT PARTICIPANT")
+                .Build();
+        }
+
+        private static Embed BuildCombatEnemySpawnedEmbed(string requestedEnemy, int requestedQuantity, IReadOnlyList<CombatParticipantSummary> participants)
+        {
+            var builder = new StringBuilder();
+            foreach (var participant in participants)
+            {
+                builder.AppendLine($"- {participant.DisplayName} (`{participant.CurrentHp}/{participant.MaxHp}`)");
+            }
+
+            var embed = new EmbedBuilder()
+                .WithTitle("PANDORA ADMIN | ENEMY SPAWNED")
+                .WithColor(new Color(255, 120, 90))
+                .WithDescription($"요청 에너미: **{requestedEnemy}**")
+                .AddField("소환 수량", $"{participants.Count} / 요청 {requestedQuantity}", inline: true)
+                .AddField("구분", "enemy", inline: true)
+                .AddField("참가자", builder.ToString().TrimEnd(), inline: false)
+                .WithFooter("PANDORA NETWORK / COMBAT PARTICIPANT")
+                .WithCurrentTimestamp();
+
+            if (participants.Count != requestedQuantity)
+            {
+                embed.AddField("수량 제한", $"현재 요청 {requestedQuantity} 중 {participants.Count}개만 처리했습니다.", inline: false);
+            }
+
+            return embed.Build();
         }
 
         private static Embed BuildActiveCombatHpEmbed(GoogleSheetService.ActiveCombatHpResult result, string action, int amount)
