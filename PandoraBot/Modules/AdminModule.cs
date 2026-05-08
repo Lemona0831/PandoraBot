@@ -469,6 +469,19 @@ namespace PandoraBot.Modules
                     found.Name,
                     $"{found.EnemyId} x{rollCount}: {summary}");
 
+                if (Context.Guild is not null)
+                {
+                    await PandoraRepositoryProvider.CombatSessions.AppendLogIfActiveAsync(
+                        Context.Guild.Id.ToString(),
+                        Context.Channel.Id.ToString(),
+                        Context.User.Id.ToString(),
+                        "combat_drop",
+                        found.Name,
+                        "",
+                        summary,
+                        $"{found.EnemyId} x{rollCount}: {summary}");
+                }
+
                 await FollowupAsync(
                     embed: BuildDropResultEmbed(found, rollCount, quantity, rolls, items),
                     ephemeral: true);

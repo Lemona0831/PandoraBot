@@ -12,4 +12,14 @@ public interface ICombatSessionRepository
     Task<CombatSessionSummary?> GetActiveCombatSessionAsync(string guildId, string channelId);
 
     Task<CombatSessionSummary> EndCombatSessionAsync(string guildId, string channelId);
+
+    Task<bool> AppendLogIfActiveAsync(
+        string guildId,
+        string channelId,
+        string actorDiscordId,
+        string actionType,
+        string targetName,
+        string beforeValue,
+        string afterValue,
+        string message);
 }

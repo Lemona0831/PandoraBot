@@ -89,6 +89,48 @@ public sealed class DbCombatSessionRepository : ICombatSessionRepository
         return Map(entity);
     }
 
+    public async Task<bool> AppendLogIfActiveAsync(
+        string guildId,
+        string channelId,
+        string actorDiscordId,
+        string actionType,
+        string targetName,
+        string beforeValue,
+        string afterValue,
+        string message)
+    {
+        await using var db = CreateDb();
+        var session = await db.CombatSessions
+            .AsNoTracking()
+            .Where(x =>
+                x.GuildId == guildId &&
+                x.ChannelId == channelId &&
+                x.Status == "active")
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (session is null)
+        {
+            return false;
+        }
+
+        db.CombatLogs.Add(new CombatLogEntity
+        {
+            Id = Guid.NewGuid(),
+            CombatSessionId = session.Id,
+            ActorDiscordId = actorDiscordId,
+            ActionType = actionType,
+            TargetName = targetName,
+            BeforeValue = beforeValue,
+            AfterValue = afterValue,
+            Message = message,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+        return true;
+    }
+
     private PandoraDbContext CreateDb()
         => PandoraDbContextFactory.CreateOrNull(connectionString)
            ?? throw new InvalidOperationException("PandoraDb connection string is not configured.");
