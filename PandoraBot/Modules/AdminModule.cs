@@ -12,7 +12,7 @@ namespace PandoraBot.Modules
     [DefaultMemberPermissions(GuildPermission.ManageGuild)]
     public class AdminModule : InteractionModuleBase<SocketInteractionContext>
     {
-        [SlashCommand("관리목록", "관리자용: 등록된 캐릭터 목록을 조회합니다.")]
+        [SlashCommand("관리목록", "등록된 캐릭터 목록을 조회합니다.")]
         public async Task ListAllCharacters(
             [Summary("개수", "1~50 사이 조회 개수")] int limit = 25)
         {
@@ -23,11 +23,11 @@ namespace PandoraBot.Modules
                 var characters = await PandoraRepositoryProvider.Characters.ListAllCharactersAsync(limit);
                 if (characters.Count == 0)
                 {
-                    await FollowupAsync("등록된 캐릭터가 없습니다.", ephemeral: true);
+                    await FollowupAsync("아직 등록된 캐릭터가 없습니다. 먼저 플레이어가 `/등록`을 마쳤는지 확인해 주세요.", ephemeral: true);
                     return;
                 }
 
-                await FollowupAsync(embed: BuildCharacterListEmbed(characters, "PANDORA ADMIN | 캐릭터 목록"), ephemeral: true);
+                await FollowupAsync(embed: BuildCharacterListEmbed(characters, "PANDORA 캐릭터 목록"), ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -36,7 +36,7 @@ namespace PandoraBot.Modules
         }
 
 
-        [SlashCommand("정보조회", "관리자용: 특정 캐릭터 정보를 조회합니다.")]
+        [SlashCommand("정보조회", "특정 캐릭터 정보를 조회합니다.")]
         public async Task ShowCharacterForAdmin(
             [Summary("캐릭터", "캐릭터 이름, 시트 제목 또는 source_sheet_id")] string characterName)
         {
@@ -53,7 +53,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("체력설정", "관리자용: 특정 캐릭터의 현재 HP를 설정합니다.")]
+        [SlashCommand("체력설정", "특정 캐릭터의 현재 HP를 설정합니다.")]
         public async Task SetCharacterHp(
             [Summary("캐릭터", "캐릭터 이름, 시트 제목 또는 source_sheet_id")] string characterName,
             [Summary("현재HP", "변경할 현재 HP")] int currentHp)
@@ -81,7 +81,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("피해", "관리자용: 특정 캐릭터에게 피해를 적용합니다.")]
+        [SlashCommand("피해", "특정 캐릭터에게 피해를 적용합니다.")]
         public async Task DamageCharacter(
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("수치", "적용할 피해량")] int amount,
@@ -90,7 +90,7 @@ namespace PandoraBot.Modules
             await AdjustHpAsync(characterName, amount, "damage", memo);
         }
 
-        [SlashCommand("회복", "관리자용: 특정 캐릭터를 회복합니다.")]
+        [SlashCommand("회복", "특정 캐릭터를 회복합니다.")]
         public async Task HealCharacter(
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("수치", "적용할 회복량")] int amount,
@@ -98,7 +98,7 @@ namespace PandoraBot.Modules
         {
             await AdjustHpAsync(characterName, amount, "heal", memo);
         }
-        [SlashCommand("관리선택해제", "관리자용: 특정 캐릭터 소유자의 선택 상태를 해제합니다.")]
+        [SlashCommand("관리선택해제", "특정 캐릭터 소유자의 선택 상태를 해제합니다.")]
         public async Task ClearUserSelection(
             [Summary("캐릭터", "캐릭터 이름")] string characterName)
         {
@@ -123,7 +123,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("관리삭제", "관리자용: 특정 캐릭터를 삭제합니다.")]
+        [SlashCommand("관리삭제", "특정 캐릭터를 삭제합니다.")]
         public async Task DeleteCharacterForAdmin(
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("확인", "True로 설정하면 캐릭터를 삭제합니다.")] bool confirm = false)
@@ -157,7 +157,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("관리승인", "관리자용: 캐릭터를 승인합니다.")]
+        [SlashCommand("관리승인", "캐릭터를 승인합니다.")]
         public async Task ApproveCharacter(
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("메모", "선택 사항: 검수 메모")] string? memo = null)
@@ -165,7 +165,7 @@ namespace PandoraBot.Modules
             await SetReviewStatusAsync(characterName, "approved", memo);
         }
 
-        [SlashCommand("관리반려", "관리자용: 캐릭터를 반려합니다.")]
+        [SlashCommand("관리반려", "캐릭터를 반려합니다.")]
         public async Task RejectCharacter(
             [Summary("캐릭터", "캐릭터 이름")] string characterName,
             [Summary("메모", "선택 사항: 반려 사유")] string? memo = null)
@@ -173,7 +173,7 @@ namespace PandoraBot.Modules
             await SetReviewStatusAsync(characterName, "rejected", memo);
         }
 
-        [SlashCommand("관리검수목록", "관리자용: 검수 상태별 캐릭터 목록을 조회합니다.")]
+        [SlashCommand("관리검수목록", "검수 상태별 캐릭터 목록을 조회합니다.")]
         public async Task ListReviewCharacters(
             [Summary("상태", "pending, approved, rejected")] string status = "pending",
             [Summary("개수", "1~50 사이 조회 개수")] int limit = 25)
@@ -185,11 +185,11 @@ namespace PandoraBot.Modules
                 var characters = await PandoraRepositoryProvider.Characters.ListReviewCharactersAsync(status, limit);
                 if (characters.Count == 0)
                 {
-                    await FollowupAsync($"`{status}` 상태의 캐릭터가 없습니다.", ephemeral: true);
+                    await FollowupAsync($"`{status}` 상태의 캐릭터가 아직 없습니다. 다른 상태로 바꿔 보거나, 먼저 `/등록`이 들어왔는지 확인해 주세요.", ephemeral: true);
                     return;
                 }
 
-                await FollowupAsync(embed: BuildCharacterListEmbed(characters, $"PANDORA ADMIN | 검수 목록: {status}"), ephemeral: true);
+                await FollowupAsync(embed: BuildCharacterListEmbed(characters, $"PANDORA 검수 목록 | {status}"), ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -198,7 +198,7 @@ namespace PandoraBot.Modules
         }
 
 
-        [SlashCommand("공지", "관리자용: 공지 템플릿을 발송하고 기록합니다.")]
+        [SlashCommand("공지", "공지 템플릿을 발송하고 기록합니다.")]
         public async Task SendNotice(
             [Summary("종류", "세션, 모집, 점검, 안내 등")] string noticeType,
             [Summary("제목", "공지 제목")] string title,
@@ -526,7 +526,7 @@ namespace PandoraBot.Modules
         public async Task ShowCombatHelper()
         {
             var embed = new EmbedBuilder()
-                .WithTitle("PANDORA ADMIN | COMBAT HELPER")
+                .WithTitle("PANDORA 전투보조")
                 .WithColor(new Color(90, 190, 255))
                 .WithDescription("지금 구현된 전투 세션 흐름에 맞춰, 진행자가 실제로 많이 쓰는 순서대로 정리한 안내입니다.")
                 .AddField("1. 세션 열기", "`/전투시작`으로 현재 채널 전투를 엽니다.\n제목을 정해 두면 로그를 다시 찾을 때 편합니다.", inline: false)
@@ -703,7 +703,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("전투참가", "관리자용: 현재 활성 전투 세션에 플레이어 캐릭터를 참가시킵니다.")]
+        [SlashCommand("전투참가", "현재 활성 전투 세션에 캐릭터를 참가시킵니다.")]
         public async Task JoinCombatSession(
             [Summary("캐릭터", "참가시킬 캐릭터 이름")] string characterName,
             [Summary("메모", "선택 사항: 참가 메모")] string? memo = null)
@@ -741,7 +741,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("에너미소환", "관리자용: 현재 활성 전투 세션에 에너미를 소환합니다.")]
+        [SlashCommand("에너미소환", "현재 활성 전투 세션에 에너미를 소환합니다.")]
         public async Task SpawnEnemies(
             [Summary("에너미", "에너미 ID 또는 이름")] string enemy,
             [Summary("수량", "소환할 수량")] int quantity = 1,
@@ -787,7 +787,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("전투퇴장", "관리자용: 현재 활성 전투 세션에서 특정 참가자를 제거합니다.")]
+        [SlashCommand("전투퇴장", "현재 활성 전투 세션에서 특정 참가자를 정리합니다.")]
         public async Task RemoveCombatParticipant(
             [Summary("대상", "참가자 ID 또는 표시명")] string target,
             [Summary("메모", "선택 사항: 제거 메모")] string? memo = null)
@@ -825,7 +825,7 @@ namespace PandoraBot.Modules
             }
         }
 
-        [SlashCommand("전투정리", "관리자용: 현재 활성 전투 세션에서 HP 0 이하 enemy를 정리합니다.")]
+        [SlashCommand("전투정리", "현재 활성 전투 세션에서 HP 0 이하 에너미를 정리합니다.")]
         public async Task CleanupCombatEnemies(
             [Summary("메모", "선택 사항: 정리 메모")] string? memo = null)
         {
@@ -1089,7 +1089,7 @@ namespace PandoraBot.Modules
         private static Embed BuildHunterEmbed(Hunter hunter)
         {
             return new EmbedBuilder()
-                .WithTitle("PANDORA ADMIN | CHARACTER DATA")
+                .WithTitle("PANDORA 캐릭터 정보")
                 .WithColor(new Color(70, 160, 255))
                 .WithDescription($"**{hunter.CharacterName}**")
                 .AddField("Discord User ID", hunter.UserId, inline: false)
@@ -1367,7 +1367,7 @@ namespace PandoraBot.Modules
         private static Embed BuildCombatParticipantAddedEmbed(CombatParticipantSummary participant, string actionTitle)
         {
             return new EmbedBuilder()
-                .WithTitle($"PANDORA ADMIN | {actionTitle}")
+                .WithTitle($"PANDORA {actionTitle}")
                 .WithColor(new Color(90, 190, 255))
                 .WithDescription($"**{participant.DisplayName}**")
                 .AddField("참가자 ID", participant.Id.ToString(), inline: false)
@@ -1388,7 +1388,7 @@ namespace PandoraBot.Modules
             }
 
             var embed = new EmbedBuilder()
-                .WithTitle("PANDORA ADMIN | ENEMY SPAWNED")
+                .WithTitle("PANDORA 에너미 소환 완료")
                 .WithColor(new Color(255, 120, 90))
                 .WithDescription($"요청 에너미: **{requestedEnemy}**")
                 .AddField("소환 수량", $"{participants.Count} / 요청 {requestedQuantity}", inline: true)
@@ -1408,7 +1408,7 @@ namespace PandoraBot.Modules
         private static Embed BuildCombatParticipantRemovedEmbed(CombatParticipantSummary participant)
         {
             return new EmbedBuilder()
-                .WithTitle("PANDORA ADMIN | COMBAT PARTICIPANT REMOVED")
+                .WithTitle("PANDORA 전투 참가자 정리")
                 .WithColor(new Color(255, 120, 90))
                 .WithDescription($"**{participant.DisplayName}**")
                 .AddField("참가자 ID", participant.Id.ToString(), inline: false)
@@ -1429,7 +1429,7 @@ namespace PandoraBot.Modules
             }
 
             return new EmbedBuilder()
-                .WithTitle("PANDORA ADMIN | COMBAT CLEANUP")
+                .WithTitle("PANDORA 전투 정리 결과")
                 .WithColor(new Color(255, 140, 90))
                 .WithDescription($"defeated enemy {removed.Count}명을 정리했습니다.")
                 .AddField("정리 대상", builder.ToString().TrimEnd(), inline: false)

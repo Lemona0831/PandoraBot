@@ -8,7 +8,7 @@ namespace PandoraBot.Modules;
 
 public class CombatModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("전투상태", "현재 채널의 활성 전투 세션과 참가자 상태를 확인합니다.")]
+    [SlashCommand("전투상태", "현재 채널의 전투 세션과 참가자 상태를 확인합니다.")]
     public async Task ShowCombatStatus()
     {
         await DeferAsync(ephemeral: true);

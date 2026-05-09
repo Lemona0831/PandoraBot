@@ -8,7 +8,7 @@ namespace PandoraBot.Modules;
 [DefaultMemberPermissions(GuildPermission.ManageGuild)]
 public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("로그", "관리자용: 판정, 관리, 공지, 전투 로그를 한곳에서 확인합니다.")]
+    [SlashCommand("로그", "판정, 관리, 공지, 전투 로그를 한곳에서 확인합니다.")]
     public async Task ShowLogs(
         [Summary("로그대상", "전체, 판정, 관리, 공지, 전투 중 하나")] string target = "전체",
         [Summary("개수", "1~50 사이 조회 개수")] int limit = 15)
@@ -32,7 +32,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("에너미추가", "관리자용: 에너미를 PostgreSQL 저장소에 추가합니다.")]
+    [SlashCommand("에너미추가", "새 에너미를 운영 목록에 추가합니다.")]
     public async Task CreateEnemy(
         [Summary("이름", "에너미 이름")] string name,
         [Summary("출현구분", "층수, 구역, 챕터 등 운영용 분류")] string category,
@@ -74,7 +74,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 created.Name,
                 $"{created.EnemyId} / HP {created.MaxHp} / {created.Category}");
 
-            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA ADMIN | ENEMY CREATED", created, "에너미를 추가했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA 에너미 추가 완료", created, "에너미를 추가했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -82,7 +82,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("에너미수정", "관리자용: 에너미 기본 정보를 수정합니다.")]
+    [SlashCommand("에너미수정", "에너미 기본 정보를 수정합니다.")]
     public async Task UpdateEnemy(
         [Summary("에너미", "에너미 ID 또는 이름 일부")] string enemy,
         [Summary("이름", "수정할 이름")] string name,
@@ -127,7 +127,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 updated.Name,
                 $"{updated.EnemyId} / HP {updated.MaxHp} / {updated.Category} / enabled={enabled}");
 
-            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA ADMIN | ENEMY UPDATED", updated, "에너미 정보를 갱신했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA 에너미 수정 완료", updated, "에너미 정보를 갱신했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -135,7 +135,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("에너미능력치", "관리자용: 에너미 능력치 하나를 바로 조정합니다.")]
+    [SlashCommand("에너미능력치", "에너미 능력치 하나를 바로 조정합니다.")]
     public async Task UpdateEnemyStat(
         [Summary("에너미", "에너미 ID 또는 이름 일부")] string enemy,
         [Summary("능력치", "근력, 민첩, 체력, 지능, 지혜, 매력, 최대HP 중 하나")] string statName,
@@ -155,7 +155,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 updated.Name,
                 $"{updated.EnemyId} / {statName}={value}");
 
-            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA ADMIN | ENEMY STAT UPDATED", updated, $"{statName} 값을 {value}로 반영했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA 에너미 능력치 반영", updated, $"{statName} 값을 {value}로 반영했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -163,7 +163,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("에너미비활성화", "관리자용: 에너미를 soft delete 방식으로 비활성화합니다.")]
+    [SlashCommand("에너미비활성화", "에너미를 비활성화하고 운영 목록에서 숨깁니다.")]
     public async Task DisableEnemy(
         [Summary("에너미", "에너미 ID 또는 이름 일부")] string enemy)
     {
@@ -180,7 +180,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 updated.Name,
                 $"{updated.EnemyId} / active=false");
 
-            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA ADMIN | ENEMY DISABLED", updated, "에너미를 비활성화했습니다. 전투 기록을 위해 데이터는 보관됩니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA 에너미 비활성화", updated, "에너미를 비활성화했습니다. 예전 기록은 그대로 남겨둡니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -188,7 +188,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("에너미활성화", "관리자용: 비활성화된 에너미를 다시 활성화합니다.")]
+    [SlashCommand("에너미활성화", "비활성화된 에너미를 다시 활성화합니다.")]
     public async Task EnableEnemy(
         [Summary("에너미", "에너미 ID 또는 이름 일부")] string enemy)
     {
@@ -205,7 +205,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 updated.Name,
                 $"{updated.EnemyId} / active=true");
 
-            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA ADMIN | ENEMY ENABLED", updated, "에너미를 다시 활성화했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildEnemyMutationEmbed("PANDORA 에너미 재활성화", updated, "에너미를 다시 활성화했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -213,7 +213,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭추가", "관리자용: 드롭 아이템을 PostgreSQL 저장소에 추가합니다.")]
+    [SlashCommand("드롭추가", "새 드롭 아이템을 등록합니다.")]
     public async Task CreateDropItem(
         [Summary("에너미ID", "드롭을 연결할 에너미 ID")] string enemyId,
         [Summary("아이템", "전리품 이름")] string itemName,
@@ -248,7 +248,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 created.ItemName,
                 $"{created.EnemyId} / {created.ItemName} / {created.Chance}% / {created.MinCount}-{created.MaxCount}");
 
-            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA ADMIN | DROP CREATED", created, "드롭 아이템을 추가했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA 드롭 추가 완료", created, "드롭 아이템을 추가했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -256,7 +256,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭목록", "관리자용: 드롭 아이템 목록을 조회합니다.")]
+    [SlashCommand("드롭목록", "등록된 드롭 아이템 목록을 조회합니다.")]
     public async Task ShowDropItems(
         [Summary("에너미", "선택 사항: 에너미 ID 또는 이름 일부")] string? enemy = null)
     {
@@ -276,7 +276,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                         return;
                     }
 
-                    await FollowupAsync("드롭 목록을 볼 에너미를 찾을 수 없습니다.", ephemeral: true);
+                    await FollowupAsync("드롭 목록을 볼 에너미를 찾지 못했습니다. `/에너미목록`으로 먼저 등록 상태를 확인해 주세요.", ephemeral: true);
                     return;
                 }
 
@@ -285,7 +285,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
 
             if (drops.Count == 0)
             {
-                await FollowupAsync("표시할 드롭 아이템이 없습니다.", ephemeral: true);
+                await FollowupAsync("아직 표시할 드롭 아이템이 없습니다. 먼저 `/드롭추가`로 아이템을 등록해 주세요.", ephemeral: true);
                 return;
             }
 
@@ -297,7 +297,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭수정", "관리자용: 등록된 드롭 아이템 정보를 수정합니다.")]
+    [SlashCommand("드롭수정", "등록된 드롭 아이템 정보를 수정합니다.")]
     public async Task UpdateDropItem(
         [Summary("에너미ID", "드롭이 연결된 에너미 ID")] string enemyId,
         [Summary("기존아이템", "수정할 기존 전리품 이름")] string currentItemName,
@@ -336,7 +336,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 updated.ItemName,
                 $"{updated.EnemyId} / {currentItemName} -> {updated.ItemName} / {updated.Chance}% / {updated.MinCount}-{updated.MaxCount}");
 
-            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA ADMIN | DROP UPDATED", updated, "드롭 아이템 정보를 갱신했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA 드롭 수정 완료", updated, "드롭 아이템 정보를 갱신했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -344,7 +344,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭삭제", "관리자용: 드롭 아이템을 soft delete 방식으로 비활성화합니다.")]
+    [SlashCommand("드롭삭제", "드롭 아이템을 비활성화하고 목록에서 숨깁니다.")]
     public async Task DeleteDropItem(
         [Summary("에너미ID", "드롭이 연결된 에너미 ID")] string enemyId,
         [Summary("아이템", "비활성화할 전리품 이름")] string itemName)
@@ -363,7 +363,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 deleted.ItemName,
                 $"{deleted.EnemyId} / soft-delete");
 
-            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA ADMIN | DROP DISABLED", deleted, "드롭 아이템을 비활성화했습니다. 기록 보존을 위해 데이터는 남겨둡니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildDropMutationEmbed("PANDORA 드롭 비활성화", deleted, "드롭 아이템을 비활성화했습니다. 예전 기록은 그대로 남겨둡니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -371,7 +371,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭설정", "관리자용: 에너미별 드롭 발생 설정을 저장합니다.")]
+    [SlashCommand("드롭설정", "에너미별 드롭 발생 설정을 저장합니다.")]
     public async Task ConfigureDropSetting(
         [Summary("에너미ID", "설정을 적용할 에너미 ID")] string enemyId,
         [Summary("발생률", "0~100 사이 전리품 발생률")] int dropRate,
@@ -395,7 +395,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                 setting.EnemyId,
                 $"rate={setting.DropRate}% / count={setting.DropCount} / allowDuplicate={setting.AllowDuplicate}");
 
-            await FollowupAsync(embed: BuildDropSettingEmbed("PANDORA ADMIN | DROP SETTING SAVED", setting, "드롭 설정을 저장했습니다."), ephemeral: true);
+            await FollowupAsync(embed: BuildDropSettingEmbed("PANDORA 드롭 설정 저장 완료", setting, "드롭 설정을 저장했습니다."), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -403,7 +403,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [SlashCommand("드롭설정보기", "관리자용: 에너미별 드롭 설정을 조회합니다.")]
+    [SlashCommand("드롭설정보기", "에너미별 드롭 설정을 조회합니다.")]
     public async Task ShowDropSetting(
         [Summary("에너미", "선택 사항: 에너미 ID 또는 이름 일부")] string? enemy = null)
     {
@@ -433,7 +433,7 @@ public class OperationsModule : InteractionModuleBase<SocketInteractionContext>
                     return;
                 }
 
-                await FollowupAsync("드롭 설정을 볼 에너미를 찾을 수 없습니다.", ephemeral: true);
+                await FollowupAsync("드롭 설정을 볼 에너미를 찾지 못했습니다. `/에너미목록`으로 먼저 확인해 주세요.", ephemeral: true);
                 return;
             }
 
