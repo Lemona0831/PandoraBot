@@ -1,6 +1,8 @@
-using Google.Apis.Sheets.v4;
+﻿using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
+using Microsoft.EntityFrameworkCore;
 using PandoraBot.Models;
+using PandoraShared.Data;
 using PandoraShared.Services;
 using System.Text.RegularExpressions;
 
@@ -17,6 +19,7 @@ namespace PandoraBot.Services
         private const string AdminLogSheet = "\uAD00\uB9AC \uB85C\uADF8";
         private const string NoticeLogSheet = "\uACF5\uC9C0 \uB85C\uADF8";
         private const string SelectionSheet = "\uC120\uD0DD \uC0C1\uD0DC";
+        private const string ActiveCombatParticipantSheet = "\uD65C\uC131 \uC804\uD22C \uCC38\uAC00\uC790";
         private const string SelectedMarker = "selected";
         private const string ReviewPending = "pending";
         private const string ReviewApproved = "approved";
@@ -24,23 +27,21 @@ namespace PandoraBot.Services
 
         private readonly SheetsService service;
         private readonly string storageSpreadsheetId;
+        private readonly string? pandoraDbConnectionString;
         private bool operationalSheetsChecked;
 
-        public EnemyService Enemies { get; }
-        public DropService Drops { get; }
 
-        private GoogleSheetService(SheetsService service, string storageSpreadsheetId)
+        private GoogleSheetService(SheetsService service, string storageSpreadsheetId, string? pandoraDbConnectionString)
         {
             this.service = service;
             this.storageSpreadsheetId = storageSpreadsheetId;
-            Enemies = new EnemyService(service, storageSpreadsheetId);
-            Drops = new DropService(service, storageSpreadsheetId, Enemies);
+            this.pandoraDbConnectionString = pandoraDbConnectionString;
         }
 
         public static GoogleSheetService Instance =>
             instance ?? throw new InvalidOperationException("GoogleSheetService has not been initialized.");
 
-        public static GoogleSheetService Initialize(SheetsService service)
+        public static GoogleSheetService Initialize(SheetsService service, string? pandoraDbConnectionString = null)
         {
             lock (InstanceLock)
             {
@@ -49,14 +50,14 @@ namespace PandoraBot.Services
                     var spreadsheetId = Environment.GetEnvironmentVariable("PANDORA_SPREADSHEET_ID")
                         ?? "13DKG_V3TD5GHxQrVpmFGQhFluPvGc3E_M5FXfdvRkqI";
 
-                    instance = new GoogleSheetService(service, spreadsheetId);
+                    instance = new GoogleSheetService(service, spreadsheetId, pandoraDbConnectionString);
                 }
 
                 return instance;
             }
         }
 
-        public async Task<RegistrationResult> RegisterAsync(string sourceSheet, string userId)
+        internal async Task<RegistrationResult> RegisterAsync(string sourceSheet, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -71,6 +72,7 @@ namespace PandoraBot.Services
                 }
 
                 var hunter = await LoadHunterFromSourceAsync(source, userId);
+                await UpsertCharacterDbAsync(hunter, source);
                 var result = await UpsertStorageAsync(hunter, source);
                 return result;
             }
@@ -85,7 +87,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> SelectCharacterAsync(string characterName, string userId)
+        private async Task<Hunter> SelectCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -126,7 +128,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetSelectedCharacterAsync(string userId)
+        private async Task<Hunter> GetSelectedCharacterAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -160,7 +162,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetCharacterAsync(string characterName, string userId)
+        private async Task<Hunter> GetCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -193,7 +195,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ClearSelectionResult> ClearSelectedCharacterAsync(string userId)
+        private async Task<ClearSelectionResult> ClearSelectedCharacterAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -227,7 +229,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<DeleteCharacterResult> DeleteCharacterAsync(string characterName, string userId)
+        private async Task<DeleteCharacterResult> DeleteCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -257,7 +259,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(string userId)
+        private async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -285,7 +287,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<AdminCharacterSummary>> ListAllCharactersAsync(int limit = 25)
+        private async Task<IReadOnlyList<AdminCharacterSummary>> ListAllCharactersAsync(int limit = 25)
         {
             await SheetLock.WaitAsync();
 
@@ -316,7 +318,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetCharacterForAdminAsync(string characterName)
+        private async Task<Hunter> GetCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -331,7 +333,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<UpdateHpResult> SetCharacterHpAsync(string characterName, int currentHp)
+        private async Task<UpdateHpResult> SetCharacterHpAsync(string characterName, int currentHp)
         {
             await SheetLock.WaitAsync();
 
@@ -352,7 +354,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<UpdateHpResult> AdjustCharacterHpAsync(
+        private async Task<UpdateHpResult> AdjustCharacterHpAsync(
             string characterName,
             int amount,
             string adminUserId,
@@ -388,7 +390,260 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string characterName)
+        private async Task<IReadOnlyList<ActiveCombatParticipant>> GetActiveCombatParticipantsAsync()
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+                return await ReadActiveCombatParticipantsAsync();
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<ActiveCombatParticipant> AddActivePlayerAsync(string characterName, string createdBy, string memo = "")
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var rows = await ReadStorageRowsAsync();
+                var matches = rows
+                    .Where(row => Normalize(row.CharacterName).Contains(Normalize(characterName)))
+                    .ToList();
+
+                if (matches.Count == 0)
+                {
+                    throw new Exception("No registered character was found with that name.");
+                }
+
+                if (matches.Count > 1)
+                {
+                    throw new Exception("Multiple characters matched that name. Use a more exact character name.");
+                }
+
+                var row = matches[0];
+                EnsureCharacterApproved(row);
+                var participant = CreateActiveParticipant(
+                    type: "player",
+                    sourceId: $"{row.UserId}::{row.CharacterName}",
+                    displayName: row.CharacterName,
+                    currentHp: row.CurrentHp,
+                    maxHp: row.MaxHp,
+                    createdBy: createdBy,
+                    memo: memo);
+
+                await AppendActiveCombatParticipantAsync(participant);
+                return participant;
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<ActiveCombatParticipant> AddActiveEnemyAsync(string enemyIdOrName, string createdBy, string memo = "")
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+                var enemyService = new EnemyService(service, storageSpreadsheetId);
+                var result = await enemyService.GetEnemyByIdOrNameAsync(enemyIdOrName);
+                if (!result.Found)
+                {
+                    if (result.HasMultipleMatches)
+                    {
+                        throw new Exception("Multiple enemies matched that query. Use an exact enemy ID or a more specific name.");
+                    }
+
+                    throw new Exception("No enemy was found with that ID or name.");
+                }
+
+                var enemy = result.Enemy!;
+                var participant = CreateActiveParticipant(
+                    type: "enemy",
+                    sourceId: enemy.EnemyId,
+                    displayName: enemy.Name,
+                    currentHp: enemy.CurrentHp,
+                    maxHp: enemy.MaxHp,
+                    createdBy: createdBy,
+                    memo: memo);
+
+                await AppendActiveCombatParticipantAsync(participant);
+                return participant;
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<ActiveCombatParticipant> UpdateActiveParticipantHpAsync(string participantId, int currentHp)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var rows = await ReadActiveCombatParticipantsAsync();
+                var target = FindActiveParticipant(rows, participantId);
+                var nextHp = ClampHp(currentHp, target.MaxHp);
+                var nextStatus = nextHp <= 0 ? "defeated" : "active";
+
+                await UpdateActiveParticipantCellsAsync(target.RowNumber, nextHp, target.MaxHp, nextStatus);
+                return target with { CurrentHp = nextHp, Status = nextStatus };
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<ActiveCombatHpResult> AdjustActiveParticipantHpAsync(
+            string participantId,
+            int amount,
+            string action,
+            string adminUserId,
+            string adminUsername,
+            string? memo = null)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                if (amount <= 0)
+                {
+                    throw new Exception("Amount must be greater than 0.");
+                }
+
+                var normalizedAction = action.Trim().ToLowerInvariant();
+                if (normalizedAction is not ("damage" or "heal"))
+                {
+                    throw new Exception("Action must be damage or heal.");
+                }
+
+                var activeRows = await ReadActiveCombatParticipantsAsync();
+                var target = FindActiveParticipant(activeRows, participantId);
+                var oldHp = target.CurrentHp;
+                var nextHp = normalizedAction == "heal"
+                    ? ClampHp(target.CurrentHp + amount, target.MaxHp)
+                    : ClampHp(target.CurrentHp - amount, target.MaxHp);
+                var nextStatus = nextHp <= 0 ? "defeated" : "active";
+
+                await UpdateActiveParticipantCellsAsync(target.RowNumber, nextHp, target.MaxHp, nextStatus);
+
+                var storageSynced = false;
+                var targetUserId = "";
+                if (string.Equals(target.Type, "player", StringComparison.OrdinalIgnoreCase))
+                {
+                    var sourceParts = target.SourceId.Split(new[] { "::" }, 2, StringSplitOptions.None);
+                    var sourceUserId = sourceParts.Length > 0 ? sourceParts[0] : "";
+                    var sourceCharacterName = sourceParts.Length > 1 ? sourceParts[1] : target.DisplayName;
+                    var storageRows = await ReadStorageRowsAsync();
+                    var storageRow = storageRows.FirstOrDefault(row =>
+                        row.UserId == sourceUserId &&
+                        Normalize(row.CharacterName) == Normalize(sourceCharacterName));
+
+                    if (storageRow == null)
+                    {
+                        storageRow = storageRows.FirstOrDefault(row =>
+                            Normalize(row.CharacterName) == Normalize(target.DisplayName));
+                    }
+
+                    if (storageRow != null)
+                    {
+                        await UpdateSingleCellAsync($"J{storageRow.RowNumber}", nextHp.ToString());
+                        targetUserId = storageRow.UserId;
+                        storageSynced = true;
+                    }
+                }
+
+                var logAction = normalizedAction == "heal" ? "전투회복" : "전투피해";
+                var memoText = string.IsNullOrWhiteSpace(memo) ? "" : $" / {memo.Trim()}";
+                await AppendAdminLogRowAsync(
+                    logAction,
+                    adminUserId,
+                    adminUsername,
+                    targetUserId,
+                    target.DisplayName,
+                    $"{target.ParticipantId} / {target.Type} / {oldHp} -> {nextHp} / amount {amount}{memoText}");
+
+                return new ActiveCombatHpResult(
+                    target.ParticipantId,
+                    target.Type,
+                    target.SourceId,
+                    target.DisplayName,
+                    oldHp,
+                    nextHp,
+                    target.MaxHp,
+                    nextStatus,
+                    storageSynced);
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<int> RemoveActiveParticipantAsync(string participantId)
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var rows = await ReadActiveCombatParticipantsAsync();
+                var target = FindActiveParticipant(rows, participantId);
+                await ClearActiveParticipantRowAsync(target.RowNumber);
+                return 1;
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<int> CleanupDefeatedEnemiesAsync()
+        {
+            await SheetLock.WaitAsync();
+
+            try
+            {
+                await EnsureOperationalSheetsAsync();
+
+                var rows = await ReadActiveCombatParticipantsAsync();
+                var targets = rows
+                    .Where(row =>
+                        string.Equals(row.Type, "enemy", StringComparison.OrdinalIgnoreCase) &&
+                        (row.CurrentHp <= 0 || string.Equals(row.Status, "defeated", StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                foreach (var target in targets)
+                {
+                    await ClearActiveParticipantRowAsync(target.RowNumber);
+                }
+
+                return targets.Count;
+            }
+            finally
+            {
+                SheetLock.Release();
+            }
+        }
+
+        private async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -422,7 +677,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string characterName)
+        private async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -442,7 +697,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ReviewResult> SetCharacterReviewStatusAsync(
+        private async Task<ReviewResult> SetCharacterReviewStatusAsync(
             string characterName,
             string status,
             string adminUserId,
@@ -479,7 +734,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<AdminCharacterSummary>> ListReviewCharactersAsync(string status = "pending", int limit = 25)
+        private async Task<IReadOnlyList<AdminCharacterSummary>> ListReviewCharactersAsync(string status = "pending", int limit = 25)
         {
             await SheetLock.WaitAsync();
 
@@ -512,7 +767,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendJudgementLogAsync(JudgementLogEntry entry)
+        private async Task AppendJudgementLogAsync(JudgementLogEntry entry)
         {
             await SheetLock.WaitAsync();
 
@@ -542,7 +797,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsAsync(int limit = 10)
+        private async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsAsync(int limit = 10)
         {
             await SheetLock.WaitAsync();
 
@@ -573,7 +828,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsForUserAsync(string userId, int limit = 10)
+        private async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsForUserAsync(string userId, int limit = 10)
         {
             await SheetLock.WaitAsync();
 
@@ -604,7 +859,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendNoticeLogAsync(string noticeType, string title, string content, string adminUserId, string adminUsername, string channelId)
+        private async Task AppendNoticeLogAsync(string noticeType, string title, string content, string adminUserId, string adminUsername, string channelId)
         {
             await SheetLock.WaitAsync();
 
@@ -628,7 +883,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendAdminLogAsync(string action, string adminUserId, string adminUsername, string targetUserId, string characterName, string detail)
+        private async Task AppendAdminLogAsync(string action, string adminUserId, string adminUsername, string targetUserId, string characterName, string detail)
         {
             await SheetLock.WaitAsync();
 
@@ -692,8 +947,14 @@ namespace PandoraBot.Services
         private async Task<RegistrationResult> UpsertStorageAsync(Hunter hunter, SheetReference source)
         {
             var rows = await ReadStorageRowsAsync();
+            var selections = await ReadSelectionRowsAsync();
             var matches = rows
-                .Where(row => row.UserId == hunter.UserId && Normalize(row.CharacterName) == Normalize(hunter.CharacterName))
+                .Where(row =>
+                    row.UserId == hunter.UserId &&
+                    (
+                        (!string.IsNullOrWhiteSpace(row.SourceSpreadsheetId) && row.SourceSpreadsheetId == source.SpreadsheetId) ||
+                        Normalize(row.CharacterName) == Normalize(hunter.CharacterName)
+                    ))
                 .ToList();
 
             var rowNumber = matches.FirstOrDefault()?.RowNumber ?? await GetNextStorageRowAsync();
@@ -711,8 +972,65 @@ namespace PandoraBot.Services
                 await ClearStorageRowAsync(duplicate.RowNumber);
             }
 
+            var selection = selections.FirstOrDefault(row => row.UserId == hunter.UserId);
+            if (selection != null && matches.Any(row => Normalize(row.CharacterName) == Normalize(selection.CharacterName)))
+            {
+                await UpsertSelectionRowAsync(hunter.UserId, hunter.CharacterName);
+            }
+
             Console.WriteLine($"[Success] {hunter.CharacterName} {(wasUpdated ? "updated" : "saved")} at row {rowNumber}.");
             return new RegistrationResult(hunter, wasUpdated, rowNumber);
+        }
+
+        private async Task UpsertCharacterDbAsync(Hunter hunter, SheetReference source)
+        {
+            var db = PandoraDbContextFactory.CreateOrNull(pandoraDbConnectionString);
+            if (db is null)
+            {
+                return;
+            }
+
+            await using (db)
+            {
+                var existing = await db.Characters.FirstOrDefaultAsync(row =>
+                    row.DiscordUserId == hunter.UserId &&
+                    row.SourceSheetId == source.SpreadsheetId);
+
+                var now = DateTimeOffset.UtcNow;
+                if (existing is null)
+                {
+                    existing = new CharacterEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        DiscordUserId = hunter.UserId,
+                        SourceSheetId = source.SpreadsheetId,
+                        CreatedAt = now,
+                        ReviewStatus = ReviewPending
+                    };
+
+                    db.Characters.Add(existing);
+                }
+
+                existing.SourceSheetUrl = source.SourceSheetUrl;
+                existing.SourceDocumentTitle = source.SourceDocumentTitle;
+                existing.ImportedCharacterName = hunter.CharacterName;
+                existing.DisplayName = hunter.CharacterName;
+                existing.NormalizedDisplayName = NormalizeForDb(hunter.CharacterName);
+                existing.Strength = hunter.Strength;
+                existing.Dexterity = hunter.Dexterity;
+                existing.Constitution = hunter.Constitution;
+                existing.Intelligence = hunter.Intelligence;
+                existing.Wisdom = hunter.Wisdom;
+                existing.Charisma = hunter.Charisma;
+                existing.CurrentHp = Math.Clamp(hunter.CurrentHp, 0, Math.Max(hunter.MaxHp, 1));
+                existing.MaxHp = Math.Max(hunter.MaxHp, 1);
+                existing.ReviewStatus = string.IsNullOrWhiteSpace(existing.ReviewStatus)
+                    ? ReviewPending
+                    : NormalizeReviewStatus(existing.ReviewStatus);
+                existing.UpdatedAt = now;
+
+                await db.SaveChangesAsync();
+            }
         }
 
         private async Task<List<StorageRow>> ReadStorageRowsAsync()
@@ -835,6 +1153,127 @@ namespace PandoraBot.Services
             await clearRequest.ExecuteAsync();
         }
 
+        private async Task<List<ActiveCombatParticipant>> ReadActiveCombatParticipantsAsync()
+        {
+            var response = await service.Spreadsheets.Values.Get(
+                storageSpreadsheetId,
+                $"{ToRangeSheetName(ActiveCombatParticipantSheet)}!A2:J").ExecuteAsync();
+            var values = response.Values ?? new List<IList<object>>();
+            var rows = new List<ActiveCombatParticipant>();
+
+            for (var index = 0; index < values.Count; index++)
+            {
+                var row = values[index];
+                var participantId = GetString(row, 0);
+                var displayName = GetString(row, 3);
+
+                if (string.IsNullOrWhiteSpace(participantId) && string.IsNullOrWhiteSpace(displayName))
+                {
+                    continue;
+                }
+
+                var maxHp = ParseOptionalInt(row, 5);
+                rows.Add(new ActiveCombatParticipant(
+                    RowNumber: index + 2,
+                    ParticipantId: participantId,
+                    Type: GetString(row, 1),
+                    SourceId: GetString(row, 2),
+                    DisplayName: displayName,
+                    CurrentHp: ClampHp(ParseOptionalInt(row, 4), maxHp),
+                    MaxHp: maxHp,
+                    Status: GetString(row, 6),
+                    CreatedBy: GetString(row, 7),
+                    CreatedAt: GetString(row, 8),
+                    Memo: GetString(row, 9)));
+            }
+
+            return rows;
+        }
+
+        private async Task AppendActiveCombatParticipantAsync(ActiveCombatParticipant participant)
+        {
+            await AppendRowAsync(ActiveCombatParticipantSheet, new List<object>
+            {
+                participant.ParticipantId,
+                participant.Type,
+                participant.SourceId,
+                participant.DisplayName,
+                participant.CurrentHp,
+                participant.MaxHp,
+                participant.Status,
+                participant.CreatedBy,
+                participant.CreatedAt,
+                participant.Memo
+            });
+        }
+
+        private async Task UpdateActiveParticipantCellsAsync(int rowNumber, int currentHp, int maxHp, string status)
+        {
+            var valueRange = new ValueRange
+            {
+                Values = new List<IList<object>>
+                {
+                    new List<object> { currentHp, maxHp, status }
+                }
+            };
+            var request = service.Spreadsheets.Values.Update(
+                valueRange,
+                storageSpreadsheetId,
+                $"{ToRangeSheetName(ActiveCombatParticipantSheet)}!E{rowNumber}:G{rowNumber}");
+            request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW;
+            await request.ExecuteAsync();
+        }
+
+        private async Task ClearActiveParticipantRowAsync(int rowNumber)
+        {
+            await service.Spreadsheets.Values.Clear(
+                new ClearValuesRequest(),
+                storageSpreadsheetId,
+                $"{ToRangeSheetName(ActiveCombatParticipantSheet)}!A{rowNumber}:J{rowNumber}").ExecuteAsync();
+        }
+
+        private static ActiveCombatParticipant CreateActiveParticipant(
+            string type,
+            string sourceId,
+            string displayName,
+            int currentHp,
+            int maxHp,
+            string createdBy,
+            string memo)
+        {
+            var participantId = $"ACP-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..36];
+            var clampedHp = ClampHp(currentHp, maxHp);
+            return new ActiveCombatParticipant(
+                RowNumber: 0,
+                ParticipantId: participantId,
+                Type: type,
+                SourceId: sourceId,
+                DisplayName: displayName,
+                CurrentHp: clampedHp,
+                MaxHp: maxHp,
+                Status: clampedHp <= 0 ? "defeated" : "active",
+                CreatedBy: createdBy,
+                CreatedAt: DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                Memo: memo);
+        }
+
+        private static ActiveCombatParticipant FindActiveParticipant(IReadOnlyList<ActiveCombatParticipant> rows, string participantId)
+        {
+            var normalized = Normalize(participantId);
+            var matches = rows
+                .Where(row =>
+                    Normalize(row.ParticipantId) == normalized ||
+                    Normalize(row.DisplayName).Contains(normalized))
+                .ToList();
+
+            return matches.Count switch
+            {
+                0 => throw new Exception("No active combat participant was found."),
+                1 => matches[0],
+                _ => throw new Exception("Multiple active combat participants matched that value. Use the ParticipantId.")
+            };
+        }
+
         private async Task ClearLegacySelectionMarkersAsync(IReadOnlyList<StorageRow> rows, string userId)
         {
             foreach (var row in rows.Where(row => row.UserId == userId && !string.IsNullOrWhiteSpace(row.Selected)))
@@ -920,7 +1359,7 @@ namespace PandoraBot.Services
                 .ToHashSet(StringComparer.Ordinal);
 
             var addRequests = new List<Request>();
-            foreach (var sheetName in new[] { JudgementLogSheet, AdminLogSheet, NoticeLogSheet, SelectionSheet })
+            foreach (var sheetName in new[] { JudgementLogSheet, AdminLogSheet, NoticeLogSheet, SelectionSheet, ActiveCombatParticipantSheet })
             {
                 if (!existingSheets.Contains(sheetName))
                 {
@@ -958,6 +1397,19 @@ namespace PandoraBot.Services
                 "유저ID", "선택캐릭터", "선택시각", "비고"
             });
 
+            await WriteHeaderRowAsync(ActiveCombatParticipantSheet, "A1:J1", new List<object>
+            {
+                "ParticipantId",
+                "Type",
+                "SourceId",
+                "DisplayName",
+                "CurrentHp",
+                "MaxHp",
+                "Status",
+                "CreatedBy",
+                "CreatedAt",
+                "Memo"
+            });
             operationalSheetsChecked = true;
         }
 
@@ -1003,20 +1455,31 @@ namespace PandoraBot.Services
             var match = Regex.Match(trimmed, @"/spreadsheets/d/([^/?#]+)", RegexOptions.IgnoreCase);
             if (!match.Success)
             {
-                return new SheetReference(storageSpreadsheetId, trimmed);
+                var localMetadata = await service.Spreadsheets.Get(storageSpreadsheetId).ExecuteAsync();
+                var localDocumentTitle = localMetadata.Properties?.Title ?? trimmed;
+                return new SheetReference(
+                    storageSpreadsheetId,
+                    trimmed,
+                    localDocumentTitle,
+                    $"https://docs.google.com/spreadsheets/d/{storageSpreadsheetId}/edit");
             }
 
             var sourceSpreadsheetId = match.Groups[1].Value;
             var gid = ExtractGid(trimmed);
             var metadata = await service.Spreadsheets.Get(sourceSpreadsheetId).ExecuteAsync();
             var sheets = metadata.Sheets ?? new List<Sheet>();
+            var documentTitle = metadata.Properties?.Title ?? sourceSpreadsheetId;
 
             if (gid.HasValue)
             {
                 var matchedSheet = sheets.FirstOrDefault(sheet => sheet.Properties?.SheetId == gid.Value);
                 if (matchedSheet?.Properties?.Title != null)
                 {
-                    return new SheetReference(sourceSpreadsheetId, matchedSheet.Properties.Title);
+                    return new SheetReference(
+                        sourceSpreadsheetId,
+                        matchedSheet.Properties.Title,
+                        documentTitle,
+                        trimmed);
                 }
 
                 throw new Exception($"No sheet tab found for gid={gid.Value}.");
@@ -1028,7 +1491,11 @@ namespace PandoraBot.Services
                 throw new Exception("No sheet tab was found in the linked spreadsheet.");
             }
 
-            return new SheetReference(sourceSpreadsheetId, firstSheetName);
+            return new SheetReference(
+                sourceSpreadsheetId,
+                firstSheetName,
+                documentTitle,
+                trimmed);
         }
 
         private static int ParseInt(IList<object> values, int index, string fieldName)
@@ -1059,6 +1526,11 @@ namespace PandoraBot.Services
         private static string Normalize(string value)
         {
             return value.Trim().ToUpperInvariant();
+        }
+
+        private static string NormalizeForDb(string value)
+        {
+            return value.Trim().ToLowerInvariant();
         }
 
         private static bool IsSelected(StorageRow row, string? selectedCharacterName)
@@ -1167,21 +1639,32 @@ namespace PandoraBot.Services
             return $"'{sheetName.Trim().Replace("'", "''")}'";
         }
 
-        public sealed record RegistrationResult(Hunter Hunter, bool WasUpdated, int RowNumber);
+        internal sealed record RegistrationResult(Hunter Hunter, bool WasUpdated, int RowNumber);
 
-        public sealed record ClearSelectionResult(int ClearedCount);
+        private sealed record ClearSelectionResult(int ClearedCount);
 
-        public sealed record DeleteCharacterResult(string CharacterName, int RowNumber);
+        private sealed record DeleteCharacterResult(string CharacterName, int RowNumber);
 
-        public sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
+        private sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
 
-        public sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus, string SelectedByUserId);
+        private sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus, string SelectedByUserId);
 
-        public sealed record UpdateHpResult(string CharacterName, string UserId, int OldHp, int CurrentHp, int MaxHp, int RowNumber);
+        private sealed record UpdateHpResult(string CharacterName, string UserId, int OldHp, int CurrentHp, int MaxHp, int RowNumber);
 
-        public sealed record ReviewResult(string CharacterName, string UserId, string ReviewStatus, int RowNumber);
+        private sealed record ActiveCombatHpResult(
+            string ParticipantId,
+            string Type,
+            string SourceId,
+            string DisplayName,
+            int OldHp,
+            int CurrentHp,
+            int MaxHp,
+            string Status,
+            bool StorageSynced);
 
-        public sealed record JudgementLogEntry(
+        private sealed record ReviewResult(string CharacterName, string UserId, string ReviewStatus, int RowNumber);
+
+        private sealed record JudgementLogEntry(
             string GuildId,
             string ChannelId,
             string UserId,
@@ -1195,9 +1678,9 @@ namespace PandoraBot.Services
             int Total,
             string Outcome);
 
-        public sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
+        private sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
 
-        private sealed record SheetReference(string SpreadsheetId, string SheetName);
+        private sealed record SheetReference(string SpreadsheetId, string SheetName, string SourceDocumentTitle, string SourceSheetUrl);
 
         private sealed record SelectionRow(int RowNumber, string UserId, string CharacterName, string SelectedAt);
 

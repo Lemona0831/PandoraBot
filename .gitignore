@@ -27,6 +27,7 @@ PandoraBot/Credental.json
 # Environment files
 .env
 .env.*
+**/appsettings.Development.json
 
 # OS files
 Thumbs.db
