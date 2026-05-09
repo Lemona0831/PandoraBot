@@ -1,4 +1,4 @@
-using Google.Apis.Sheets.v4;
+﻿using Google.Apis.Sheets.v4;
 using PandoraShared.Models;
 using PandoraShared.Services;
 using Microsoft.EntityFrameworkCore;
@@ -418,33 +418,19 @@ public sealed class SheetsToPostgresImporter
                 continue;
             }
 
-            var memoParts = new List<string>();
-            if (row.Weight > 0)
-            {
-                memoParts.Add($"weight={row.Weight}");
-            }
-            if (!string.IsNullOrWhiteSpace(row.Rarity))
-            {
-                memoParts.Add($"rarity={row.Rarity}");
-            }
-            if (!string.IsNullOrWhiteSpace(row.Tag))
-            {
-                memoParts.Add($"tag={row.Tag}");
-            }
-            if (!string.IsNullOrWhiteSpace(row.Memo))
-            {
-                memoParts.Add(row.Memo);
-            }
-
             drops.Add(new EnemyDropEntity
             {
                 Id = Guid.NewGuid(),
                 EnemyId = enemy.Id,
                 ItemName = row.ItemName,
                 Probability = NormalizeProbability(row.Chance),
-                MinQuantity = Math.Max(0, row.MinCount),
-                MaxQuantity = Math.Max(Math.Max(0, row.MinCount), row.MaxCount),
-                Memo = string.Join("; ", memoParts)
+                MinQuantity = Math.Max(1, row.MinCount),
+                MaxQuantity = Math.Max(Math.Max(1, row.MinCount), row.MaxCount),
+                Weight = Math.Max(0, row.Weight),
+                Rarity = row.Rarity,
+                Tag = row.Tag,
+                IsActive = true,
+                Memo = row.Memo
             });
         }
 
@@ -466,17 +452,14 @@ public sealed class SheetsToPostgresImporter
                 continue;
             }
 
-            var memo = row.AllowDuplicate
-                ? string.IsNullOrWhiteSpace(row.Memo) ? "allow_duplicate=true" : $"allow_duplicate=true; {row.Memo}"
-                : row.Memo;
-
             settings.Add(new EnemyDropSettingEntity
             {
                 Id = Guid.NewGuid(),
                 EnemyId = enemy.Id,
                 DropRate = NormalizeProbability(row.DropRate),
-                DropSlots = Math.Max(0, row.DropCount),
-                Memo = memo
+                DropSlots = Math.Max(1, row.DropCount),
+                AllowDuplicate = row.AllowDuplicate,
+                Memo = row.Memo
             });
         }
 
@@ -566,3 +549,4 @@ public sealed class SheetsToPostgresImporter
         return $"'{sheetName.Trim().Replace("'", "''")}'";
     }
 }
+

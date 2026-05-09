@@ -1,4 +1,4 @@
-using Google.Apis.Sheets.v4;
+﻿using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 using Microsoft.EntityFrameworkCore;
 using PandoraBot.Models;
@@ -30,16 +30,12 @@ namespace PandoraBot.Services
         private readonly string? pandoraDbConnectionString;
         private bool operationalSheetsChecked;
 
-        public EnemyService Enemies { get; }
-        public DropService Drops { get; }
 
         private GoogleSheetService(SheetsService service, string storageSpreadsheetId, string? pandoraDbConnectionString)
         {
             this.service = service;
             this.storageSpreadsheetId = storageSpreadsheetId;
             this.pandoraDbConnectionString = pandoraDbConnectionString;
-            Enemies = new EnemyService(service, storageSpreadsheetId);
-            Drops = new DropService(service, storageSpreadsheetId, Enemies);
         }
 
         public static GoogleSheetService Instance =>
@@ -61,7 +57,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<RegistrationResult> RegisterAsync(string sourceSheet, string userId)
+        internal async Task<RegistrationResult> RegisterAsync(string sourceSheet, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -91,7 +87,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> SelectCharacterAsync(string characterName, string userId)
+        private async Task<Hunter> SelectCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -132,7 +128,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetSelectedCharacterAsync(string userId)
+        private async Task<Hunter> GetSelectedCharacterAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -166,7 +162,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetCharacterAsync(string characterName, string userId)
+        private async Task<Hunter> GetCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -199,7 +195,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ClearSelectionResult> ClearSelectedCharacterAsync(string userId)
+        private async Task<ClearSelectionResult> ClearSelectedCharacterAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -233,7 +229,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<DeleteCharacterResult> DeleteCharacterAsync(string characterName, string userId)
+        private async Task<DeleteCharacterResult> DeleteCharacterAsync(string characterName, string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -263,7 +259,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(string userId)
+        private async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(string userId)
         {
             await SheetLock.WaitAsync();
 
@@ -291,7 +287,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<AdminCharacterSummary>> ListAllCharactersAsync(int limit = 25)
+        private async Task<IReadOnlyList<AdminCharacterSummary>> ListAllCharactersAsync(int limit = 25)
         {
             await SheetLock.WaitAsync();
 
@@ -322,7 +318,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<Hunter> GetCharacterForAdminAsync(string characterName)
+        private async Task<Hunter> GetCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -337,7 +333,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<UpdateHpResult> SetCharacterHpAsync(string characterName, int currentHp)
+        private async Task<UpdateHpResult> SetCharacterHpAsync(string characterName, int currentHp)
         {
             await SheetLock.WaitAsync();
 
@@ -358,7 +354,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<UpdateHpResult> AdjustCharacterHpAsync(
+        private async Task<UpdateHpResult> AdjustCharacterHpAsync(
             string characterName,
             int amount,
             string adminUserId,
@@ -394,7 +390,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<ActiveCombatParticipant>> GetActiveCombatParticipantsAsync()
+        private async Task<IReadOnlyList<ActiveCombatParticipant>> GetActiveCombatParticipantsAsync()
         {
             await SheetLock.WaitAsync();
 
@@ -409,7 +405,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ActiveCombatParticipant> AddActivePlayerAsync(string characterName, string createdBy, string memo = "")
+        private async Task<ActiveCombatParticipant> AddActivePlayerAsync(string characterName, string createdBy, string memo = "")
         {
             await SheetLock.WaitAsync();
 
@@ -452,15 +448,15 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ActiveCombatParticipant> AddActiveEnemyAsync(string enemyIdOrName, string createdBy, string memo = "")
+        private async Task<ActiveCombatParticipant> AddActiveEnemyAsync(string enemyIdOrName, string createdBy, string memo = "")
         {
             await SheetLock.WaitAsync();
 
             try
             {
                 await EnsureOperationalSheetsAsync();
-
-                var result = await Enemies.GetEnemyByIdOrNameAsync(enemyIdOrName);
+                var enemyService = new EnemyService(service, storageSpreadsheetId);
+                var result = await enemyService.GetEnemyByIdOrNameAsync(enemyIdOrName);
                 if (!result.Found)
                 {
                     if (result.HasMultipleMatches)
@@ -490,7 +486,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ActiveCombatParticipant> UpdateActiveParticipantHpAsync(string participantId, int currentHp)
+        private async Task<ActiveCombatParticipant> UpdateActiveParticipantHpAsync(string participantId, int currentHp)
         {
             await SheetLock.WaitAsync();
 
@@ -512,7 +508,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ActiveCombatHpResult> AdjustActiveParticipantHpAsync(
+        private async Task<ActiveCombatHpResult> AdjustActiveParticipantHpAsync(
             string participantId,
             int amount,
             string action,
@@ -600,7 +596,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<int> RemoveActiveParticipantAsync(string participantId)
+        private async Task<int> RemoveActiveParticipantAsync(string participantId)
         {
             await SheetLock.WaitAsync();
 
@@ -619,7 +615,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<int> CleanupDefeatedEnemiesAsync()
+        private async Task<int> CleanupDefeatedEnemiesAsync()
         {
             await SheetLock.WaitAsync();
 
@@ -647,7 +643,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string characterName)
+        private async Task<ClearSelectionResult> ClearSelectedCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -681,7 +677,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string characterName)
+        private async Task<DeleteCharacterResult> DeleteCharacterForAdminAsync(string characterName)
         {
             await SheetLock.WaitAsync();
 
@@ -701,7 +697,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<ReviewResult> SetCharacterReviewStatusAsync(
+        private async Task<ReviewResult> SetCharacterReviewStatusAsync(
             string characterName,
             string status,
             string adminUserId,
@@ -738,7 +734,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<AdminCharacterSummary>> ListReviewCharactersAsync(string status = "pending", int limit = 25)
+        private async Task<IReadOnlyList<AdminCharacterSummary>> ListReviewCharactersAsync(string status = "pending", int limit = 25)
         {
             await SheetLock.WaitAsync();
 
@@ -771,7 +767,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendJudgementLogAsync(JudgementLogEntry entry)
+        private async Task AppendJudgementLogAsync(JudgementLogEntry entry)
         {
             await SheetLock.WaitAsync();
 
@@ -801,7 +797,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsAsync(int limit = 10)
+        private async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsAsync(int limit = 10)
         {
             await SheetLock.WaitAsync();
 
@@ -832,7 +828,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsForUserAsync(string userId, int limit = 10)
+        private async Task<IReadOnlyList<JudgementLogSummary>> ListRecentJudgementLogsForUserAsync(string userId, int limit = 10)
         {
             await SheetLock.WaitAsync();
 
@@ -863,7 +859,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendNoticeLogAsync(string noticeType, string title, string content, string adminUserId, string adminUsername, string channelId)
+        private async Task AppendNoticeLogAsync(string noticeType, string title, string content, string adminUserId, string adminUsername, string channelId)
         {
             await SheetLock.WaitAsync();
 
@@ -887,7 +883,7 @@ namespace PandoraBot.Services
             }
         }
 
-        public async Task AppendAdminLogAsync(string action, string adminUserId, string adminUsername, string targetUserId, string characterName, string detail)
+        private async Task AppendAdminLogAsync(string action, string adminUserId, string adminUsername, string targetUserId, string characterName, string detail)
         {
             await SheetLock.WaitAsync();
 
@@ -1643,19 +1639,19 @@ namespace PandoraBot.Services
             return $"'{sheetName.Trim().Replace("'", "''")}'";
         }
 
-        public sealed record RegistrationResult(Hunter Hunter, bool WasUpdated, int RowNumber);
+        internal sealed record RegistrationResult(Hunter Hunter, bool WasUpdated, int RowNumber);
 
-        public sealed record ClearSelectionResult(int ClearedCount);
+        private sealed record ClearSelectionResult(int ClearedCount);
 
-        public sealed record DeleteCharacterResult(string CharacterName, int RowNumber);
+        private sealed record DeleteCharacterResult(string CharacterName, int RowNumber);
 
-        public sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
+        private sealed record CharacterSummary(string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus);
 
-        public sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus, string SelectedByUserId);
+        private sealed record AdminCharacterSummary(string UserId, string CharacterName, int CurrentHp, int MaxHp, bool IsSelected, int RowNumber, string ReviewStatus, string SelectedByUserId);
 
-        public sealed record UpdateHpResult(string CharacterName, string UserId, int OldHp, int CurrentHp, int MaxHp, int RowNumber);
+        private sealed record UpdateHpResult(string CharacterName, string UserId, int OldHp, int CurrentHp, int MaxHp, int RowNumber);
 
-        public sealed record ActiveCombatHpResult(
+        private sealed record ActiveCombatHpResult(
             string ParticipantId,
             string Type,
             string SourceId,
@@ -1666,9 +1662,9 @@ namespace PandoraBot.Services
             string Status,
             bool StorageSynced);
 
-        public sealed record ReviewResult(string CharacterName, string UserId, string ReviewStatus, int RowNumber);
+        private sealed record ReviewResult(string CharacterName, string UserId, string ReviewStatus, int RowNumber);
 
-        public sealed record JudgementLogEntry(
+        private sealed record JudgementLogEntry(
             string GuildId,
             string ChannelId,
             string UserId,
@@ -1682,7 +1678,7 @@ namespace PandoraBot.Services
             int Total,
             string Outcome);
 
-        public sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
+        private sealed record JudgementLogSummary(string CreatedAt, string Username, string CharacterName, string StatCode, string Total, string Outcome);
 
         private sealed record SheetReference(string SpreadsheetId, string SheetName, string SourceDocumentTitle, string SourceSheetUrl);
 

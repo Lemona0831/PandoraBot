@@ -1,4 +1,4 @@
-using PandoraShared.Models;
+﻿using PandoraShared.Models;
 
 namespace PandoraBot.Repositories;
 
@@ -12,4 +12,5 @@ public sealed class UnavailableEnemyRepository : IEnemyRepository
     public Task<EnemyRow> CreateEnemyAsync(EnemyCreateInput input) => throw CreateException();
     public Task<EnemyRow> UpdateEnemyAsync(string idOrName, EnemyEditInput input) => throw CreateException();
     public Task<EnemyRow> UpdateEnemyStatAsync(string idOrName, string statName, int value) => throw CreateException();
+    public Task<EnemyRow> SetEnemyActiveAsync(string idOrName, bool isActive) => throw CreateException();
 }

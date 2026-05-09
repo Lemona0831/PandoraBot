@@ -1,4 +1,4 @@
-using Discord;
+﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Google.Apis.Auth.OAuth2;
@@ -144,6 +144,17 @@ public class Program
 
     private async Task HandleInteractionAsync(SocketInteraction interaction)
     {
+        var interactionName = interaction switch
+        {
+            SocketSlashCommand slash => $"slash:{slash.CommandName}",
+            SocketMessageComponent component => $"component:{component.Data.CustomId}",
+            SocketModal modal => $"modal:{modal.Data.CustomId}",
+            SocketAutocompleteInteraction autocomplete => $"autocomplete:{autocomplete.Data.CommandName}",
+            _ => interaction.Type.ToString()
+        };
+
+        Console.WriteLine($"[INTERACTION] type={interaction.Type} name={interactionName} user={interaction.User.Id} channel={interaction.Channel.Id}");
+
         var context = new SocketInteractionContext(client, interaction);
         var result = await interactions!.ExecuteCommandAsync(context, services: null);
 
@@ -285,3 +296,4 @@ public class Program
         return null;
     }
 }
+

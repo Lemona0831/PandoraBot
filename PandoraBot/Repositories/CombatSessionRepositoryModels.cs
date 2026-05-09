@@ -10,3 +10,9 @@ public sealed record CombatSessionSummary(
     DateTimeOffset CreatedAt,
     DateTimeOffset? EndedAt,
     string Memo);
+
+public sealed record CombatSessionEndResult(
+    CombatSessionSummary Session,
+    int CleanedParticipantCount,
+    int CleanedPlayerCount,
+    int CleanedEnemyCount);

@@ -1,4 +1,4 @@
-using Discord;
+﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using PandoraBot.Repositories;
@@ -8,7 +8,7 @@ namespace PandoraBot.Modules;
 
 public class CombatModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("전투상태", "현재 채널의 활성 전투 세션 참가자 상태를 확인합니다.")]
+    [SlashCommand("전투상태", "현재 채널의 활성 전투 세션과 참가자 상태를 확인합니다.")]
     public async Task ShowCombatStatus()
     {
         await DeferAsync(ephemeral: true);
@@ -27,7 +27,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
 
             if (session is null)
             {
-                await FollowupAsync("현재 채널에 활성 전투 세션이 없습니다. 먼저 `/전투시작`으로 세션을 열어주세요.", ephemeral: true);
+                await FollowupAsync("이 채널에는 아직 열린 전투 세션이 없습니다. 먼저 `/전투시작`으로 전투를 열어 주세요.", ephemeral: true);
                 return;
             }
 
@@ -48,7 +48,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         {
             if (ex.Message.Contains("활성 전투 세션", StringComparison.OrdinalIgnoreCase))
             {
-                await FollowupAsync("현재 채널에 활성 전투 세션이 없습니다. 먼저 `/전투시작`으로 세션을 열어주세요.", ephemeral: true);
+                await FollowupAsync("이 채널에는 아직 열린 전투 세션이 없습니다. 먼저 `/전투시작`으로 전투를 열어 주세요.", ephemeral: true);
                 return;
             }
 
@@ -70,14 +70,14 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
             .ToList();
 
         var embed = new EmbedBuilder()
-            .WithTitle("PANDORA | COMBAT STATUS (ADMIN)")
+            .WithTitle("PANDORA 전투상태 | 진행자 화면")
             .WithColor(new Color(90, 190, 255))
-            .WithDescription($"**{session.Title}**")
+            .WithDescription($"현재 전투 세션 **{session.Title}** 의 참가자 상태를 보여 드립니다.")
             .AddField("세션", $"`{session.Id}`", inline: false)
-            .AddField("참가자 수", $"{participants.Count}명", inline: true)
+            .AddField("참가자", $"{participants.Count}명", inline: true)
             .AddField("플레이어", $"{players.Count}명", inline: true)
             .AddField("에너미", $"{enemies.Count}명", inline: true)
-            .WithFooter("PANDORA NETWORK / ADMIN COMBAT BOARD")
+            .WithFooter("진행자는 플레이어와 에너미 HP를 모두 확인할 수 있습니다.")
             .WithCurrentTimestamp();
 
         embed.AddField("플레이어", BuildAdminParticipantLines(players, includeHp: true), inline: false);
@@ -101,12 +101,12 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
             .ToList();
 
         var embed = new EmbedBuilder()
-            .WithTitle("PANDORA | COMBAT STATUS")
+            .WithTitle("PANDORA 전투상태")
             .WithColor(new Color(90, 190, 255))
-            .WithDescription($"**{session.Title}**")
+            .WithDescription($"현재 전투 세션 **{session.Title}** 의 공개 상태를 보여 드립니다.")
             .AddField("플레이어", BuildPlayerParticipantLines(players), inline: false)
             .AddField("에너미", BuildEnemyNameOnlyLines(enemies), inline: false)
-            .WithFooter("PANDORA NETWORK / PLAYER COMBAT BOARD")
+            .WithFooter("플레이어 화면에서는 에너미 정보를 최소한으로만 표시합니다.")
             .WithCurrentTimestamp();
 
         AppendOverflowNote(embed, players.Count, enemies.Count);
@@ -195,7 +195,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
 
         embed.AddField(
             "표시 제한",
-            $"가독성을 위해 플레이어는 최대 15명, 에너미는 최대 20명까지만 표시합니다. 전체 수: 플레이어 {playerCount}명 / 에너미 {enemyCount}명",
+            $"가독성을 위해 플레이어는 최대 15명, 에너미는 최대 20명까지만 표시합니다. 현재는 플레이어 {playerCount}명 / 에너미 {enemyCount}명입니다.",
             inline: false);
     }
 
@@ -209,7 +209,7 @@ public class CombatModule : InteractionModuleBase<SocketInteractionContext>
         if (message.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("429", StringComparison.OrdinalIgnoreCase))
         {
-            return "전투 상태 요청이 잠시 몰렸습니다. 몇 초 후 다시 시도해 주세요.";
+            return "전투 상태 요청이 잠시 몰렸습니다. 몇 초 뒤 다시 시도해 주세요.";
         }
 
         return $"전투 상태를 불러오는 중 문제가 발생했습니다: {message}";

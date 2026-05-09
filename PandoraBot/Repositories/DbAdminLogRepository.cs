@@ -1,4 +1,4 @@
-using PandoraShared.Data;
+﻿using PandoraShared.Data;
 
 namespace PandoraBot.Repositories;
 
@@ -26,10 +26,12 @@ public sealed class DbAdminLogRepository : IAdminLogRepository
         {
             Id = Guid.NewGuid(),
             AdminDiscordId = string.IsNullOrWhiteSpace(adminUserId) ? adminUsername : adminUserId,
+            AdminDisplayName = adminUsername ?? string.Empty,
             ActionType = action,
             TargetType = string.IsNullOrWhiteSpace(targetUserId) ? "system" : "user",
             TargetId = string.IsNullOrWhiteSpace(targetUserId) ? characterName : targetUserId,
-            BeforeValue = "",
+            TargetDisplayName = characterName ?? string.Empty,
+            BeforeValue = string.Empty,
             AfterValue = detail,
             Message = $"{characterName} | {detail}",
             CreatedAt = DateTimeOffset.UtcNow

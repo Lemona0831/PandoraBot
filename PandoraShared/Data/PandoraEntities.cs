@@ -1,4 +1,4 @@
-namespace PandoraShared.Data;
+﻿namespace PandoraShared.Data;
 
 public sealed class CharacterEntity
 {
@@ -53,9 +53,11 @@ public sealed class AdminLogEntity
 {
     public Guid Id { get; set; }
     public string AdminDiscordId { get; set; } = "";
+    public string AdminDisplayName { get; set; } = "";
     public string ActionType { get; set; } = "";
     public string TargetType { get; set; } = "";
     public string TargetId { get; set; } = "";
+    public string TargetDisplayName { get; set; } = "";
     public string BeforeValue { get; set; } = "";
     public string AfterValue { get; set; } = "";
     public string Message { get; set; } = "";
@@ -91,6 +93,10 @@ public sealed class EnemyDropEntity
     public decimal Probability { get; set; }
     public int MinQuantity { get; set; }
     public int MaxQuantity { get; set; }
+    public int Weight { get; set; }
+    public string Rarity { get; set; } = "";
+    public string Tag { get; set; } = "";
+    public bool IsActive { get; set; } = true;
     public string Memo { get; set; } = "";
 
     public EnemyEntity? Enemy { get; set; }
@@ -102,6 +108,7 @@ public sealed class EnemyDropSettingEntity
     public Guid EnemyId { get; set; }
     public decimal DropRate { get; set; }
     public int DropSlots { get; set; }
+    public bool AllowDuplicate { get; set; }
     public string Memo { get; set; } = "";
 
     public EnemyEntity? Enemy { get; set; }
@@ -130,11 +137,14 @@ public sealed class CombatParticipantEntity
     public string Type { get; set; } = "";
     public string SourceId { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public string NormalizedDisplayName { get; set; } = "";
     public int CurrentHp { get; set; }
     public int MaxHp { get; set; }
     public string Status { get; set; } = "";
+    public string CreatedByDiscordId { get; set; } = "";
     public string Memo { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 
     public CombatSessionEntity? CombatSession { get; set; }
 }
@@ -145,6 +155,7 @@ public sealed class CombatLogEntity
     public Guid CombatSessionId { get; set; }
     public string ActorDiscordId { get; set; } = "";
     public string ActionType { get; set; } = "";
+    public Guid? TargetParticipantId { get; set; }
     public string TargetName { get; set; } = "";
     public string BeforeValue { get; set; } = "";
     public string AfterValue { get; set; } = "";

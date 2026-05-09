@@ -1,4 +1,4 @@
-namespace PandoraBot.Repositories;
+﻿namespace PandoraBot.Repositories;
 
 public static class PandoraRepositoryProvider
 {
@@ -8,6 +8,7 @@ public static class PandoraRepositoryProvider
     public static ILogRepository Logs { get; private set; } = new UnavailableLogRepository();
     public static ICombatSessionRepository CombatSessions { get; private set; } = new UnavailableCombatSessionRepository();
     public static ICombatParticipantRepository CombatParticipants { get; private set; } = new UnavailableCombatParticipantRepository();
+    public static ICharacterRepository Characters { get; private set; } = new UnavailableCharacterRepository();
 
     public static void Initialize(string? connectionString)
     {
@@ -19,6 +20,7 @@ public static class PandoraRepositoryProvider
             Logs = new UnavailableLogRepository();
             CombatSessions = new UnavailableCombatSessionRepository();
             CombatParticipants = new UnavailableCombatParticipantRepository();
+            Characters = new UnavailableCharacterRepository();
             return;
         }
 
@@ -28,5 +30,6 @@ public static class PandoraRepositoryProvider
         Logs = new DbLogRepository(connectionString);
         CombatSessions = new DbCombatSessionRepository(connectionString);
         CombatParticipants = new DbCombatParticipantRepository(connectionString);
+        Characters = new DbCharacterRepository(connectionString);
     }
 }

@@ -159,6 +159,15 @@ public sealed class DbEnemyRepository : IEnemyRepository
         return MapEnemy(entity);
     }
 
+    public async Task<EnemyRow> SetEnemyActiveAsync(string idOrName, bool isActive)
+    {
+        await using var db = CreateDb();
+        var entity = await FindEnemyEntityAsync(db, idOrName);
+        entity.IsActive = isActive;
+        await db.SaveChangesAsync();
+        return MapEnemy(entity);
+    }
+
     private PandoraDbContext CreateDb()
         => PandoraDbContextFactory.CreateOrNull(connectionString)
            ?? throw new InvalidOperationException("PandoraDb connection string is not configured.");

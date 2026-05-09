@@ -15,8 +15,8 @@ public sealed class UnavailableCombatSessionRepository : ICombatSessionRepositor
     public Task<CombatSessionSummary?> GetActiveCombatSessionAsync(string guildId, string channelId)
         => Task.FromException<CombatSessionSummary?>(new InvalidOperationException(Message));
 
-    public Task<CombatSessionSummary> EndCombatSessionAsync(string guildId, string channelId)
-        => Task.FromException<CombatSessionSummary>(new InvalidOperationException(Message));
+    public Task<CombatSessionEndResult> EndCombatSessionAsync(string guildId, string channelId, string endedByDiscordId)
+        => Task.FromException<CombatSessionEndResult>(new InvalidOperationException(Message));
 
     public Task<bool> AppendLogIfActiveAsync(
         string guildId,

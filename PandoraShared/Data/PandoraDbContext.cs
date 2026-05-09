@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
@@ -100,14 +100,17 @@ public sealed class PandoraDbContext : DbContext
         entity.HasKey(x => x.Id);
         entity.Property(x => x.Id).ValueGeneratedNever();
         entity.Property(x => x.AdminDiscordId).HasMaxLength(64).IsRequired();
+        entity.Property(x => x.AdminDisplayName).HasMaxLength(128);
         entity.Property(x => x.ActionType).HasMaxLength(64).IsRequired();
         entity.Property(x => x.TargetType).HasMaxLength(64).IsRequired();
         entity.Property(x => x.TargetId).HasMaxLength(128).IsRequired();
+        entity.Property(x => x.TargetDisplayName).HasMaxLength(128);
         entity.Property(x => x.BeforeValue).HasMaxLength(2048);
         entity.Property(x => x.AfterValue).HasMaxLength(2048);
         entity.Property(x => x.Message).HasMaxLength(4096);
         entity.HasIndex(x => x.CreatedAt);
         entity.HasIndex(x => new { x.TargetType, x.TargetId });
+        entity.HasIndex(x => x.ActionType);
     }
 
     private static void ConfigureEnemies(ModelBuilder modelBuilder)
@@ -133,8 +136,12 @@ public sealed class PandoraDbContext : DbContext
         entity.Property(x => x.Id).ValueGeneratedNever();
         entity.Property(x => x.ItemName).HasMaxLength(128).IsRequired();
         entity.Property(x => x.Probability).HasPrecision(5, 4);
+        entity.Property(x => x.Rarity).HasMaxLength(64);
+        entity.Property(x => x.Tag).HasMaxLength(64);
         entity.Property(x => x.Memo).HasMaxLength(2048);
         entity.HasIndex(x => x.EnemyId);
+        entity.HasIndex(x => new { x.EnemyId, x.ItemName }).IsUnique();
+        entity.HasIndex(x => new { x.EnemyId, x.IsActive });
         entity.HasOne(x => x.Enemy)
             .WithMany(x => x.Drops)
             .HasForeignKey(x => x.EnemyId)
@@ -181,10 +188,13 @@ public sealed class PandoraDbContext : DbContext
         entity.Property(x => x.Type).HasMaxLength(32).IsRequired();
         entity.Property(x => x.SourceId).HasMaxLength(128).IsRequired();
         entity.Property(x => x.DisplayName).HasMaxLength(128).IsRequired();
+        entity.Property(x => x.NormalizedDisplayName).HasMaxLength(128).IsRequired();
         entity.Property(x => x.Status).HasMaxLength(32).IsRequired();
+        entity.Property(x => x.CreatedByDiscordId).HasMaxLength(64);
         entity.Property(x => x.Memo).HasMaxLength(4096);
         entity.HasIndex(x => x.CombatSessionId);
         entity.HasIndex(x => new { x.CombatSessionId, x.DisplayName });
+        entity.HasIndex(x => new { x.CombatSessionId, x.NormalizedDisplayName });
         entity.HasOne(x => x.CombatSession)
             .WithMany(x => x.Participants)
             .HasForeignKey(x => x.CombatSessionId)
@@ -204,6 +214,7 @@ public sealed class PandoraDbContext : DbContext
         entity.Property(x => x.AfterValue).HasMaxLength(2048);
         entity.Property(x => x.Message).HasMaxLength(4096);
         entity.HasIndex(x => x.CombatSessionId);
+        entity.HasIndex(x => x.TargetParticipantId);
         entity.HasIndex(x => x.CreatedAt);
         entity.HasOne(x => x.CombatSession)
             .WithMany(x => x.Logs)

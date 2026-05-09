@@ -119,7 +119,7 @@ public sealed class DbLogRepository : ILogRepository
             .Select(row => new UnifiedLogEntry(
                 Category: row.ActionType.StartsWith("notice:", StringComparison.OrdinalIgnoreCase) ? "공지" : "관리",
                 Action: row.ActionType,
-                Target: string.IsNullOrWhiteSpace(row.TargetId) ? row.TargetType : row.TargetId,
+                Target: string.IsNullOrWhiteSpace(row.TargetDisplayName) ? (string.IsNullOrWhiteSpace(row.TargetId) ? row.TargetType : row.TargetId) : row.TargetDisplayName,
                 Summary: string.IsNullOrWhiteSpace(row.Message) ? row.AfterValue : row.Message,
                 CreatedAt: row.CreatedAt))
             .ToList();

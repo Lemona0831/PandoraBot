@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PandoraShared.Data;
 
 namespace PandoraBot.Repositories;
@@ -32,19 +32,23 @@ public sealed class DbCombatSessionRepository : ICombatSessionRepository
 
         if (existing is not null)
         {
-            throw new InvalidOperationException("이 채널에는 이미 진행 중인 활성 전투 세션이 있습니다.");
+            throw new InvalidOperationException("현재 채널에는 이미 진행 중인 활성 전투 세션이 있습니다.");
         }
+
+        var safeTitle = string.IsNullOrWhiteSpace(title)
+            ? $"전투 {DateTimeOffset.UtcNow:MM-dd HH:mm}"
+            : title.Trim();
 
         var entity = new CombatSessionEntity
         {
             Id = Guid.NewGuid(),
             GuildId = guildId,
             ChannelId = channelId,
-            Title = title.Trim(),
+            Title = safeTitle,
             Status = "active",
             CreatedByDiscordId = createdByDiscordId,
             CreatedAt = DateTimeOffset.UtcNow,
-            Memo = memo ?? ""
+            Memo = memo ?? string.Empty
         };
 
         db.CombatSessions.Add(entity);
@@ -67,7 +71,7 @@ public sealed class DbCombatSessionRepository : ICombatSessionRepository
         return entity is null ? null : Map(entity);
     }
 
-    public async Task<CombatSessionSummary> EndCombatSessionAsync(string guildId, string channelId)
+    public async Task<CombatSessionEndResult> EndCombatSessionAsync(string guildId, string channelId, string endedByDiscordId)
     {
         await using var db = CreateDb();
         var entity = await db.CombatSessions
@@ -80,13 +84,50 @@ public sealed class DbCombatSessionRepository : ICombatSessionRepository
 
         if (entity is null)
         {
-            throw new InvalidOperationException("이 채널에는 종료할 활성 전투 세션이 없습니다.");
+            throw new InvalidOperationException("현재 채널에는 종료할 활성 전투 세션이 없습니다.");
+        }
+
+        var endedAt = DateTimeOffset.UtcNow;
+        var participants = await db.CombatParticipants
+            .Where(x =>
+                x.CombatSessionId == entity.Id &&
+                x.Status != "left" &&
+                x.Status != "removed")
+            .ToListAsync();
+
+        var cleanedPlayerCount = participants.Count(x => !string.Equals(x.Type, "enemy", StringComparison.OrdinalIgnoreCase));
+        var cleanedEnemyCount = participants.Count(x => string.Equals(x.Type, "enemy", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var participant in participants)
+        {
+            participant.Status = string.Equals(participant.Type, "enemy", StringComparison.OrdinalIgnoreCase)
+                ? "removed"
+                : "left";
+            participant.UpdatedAt = endedAt;
         }
 
         entity.Status = "ended";
-        entity.EndedAt = DateTimeOffset.UtcNow;
+        entity.EndedAt = endedAt;
+
+        db.CombatLogs.Add(new CombatLogEntity
+        {
+            Id = Guid.NewGuid(),
+            CombatSessionId = entity.Id,
+            ActorDiscordId = endedByDiscordId,
+            ActionType = "combat_session_end",
+            TargetName = entity.Title,
+            BeforeValue = $"open_participants={participants.Count}",
+            AfterValue = "ended",
+            Message = $"세션 종료와 함께 참가자 {participants.Count}명을 정리했습니다.",
+            CreatedAt = endedAt
+        });
+
         await db.SaveChangesAsync();
-        return Map(entity);
+        return new CombatSessionEndResult(
+            Map(entity),
+            participants.Count,
+            cleanedPlayerCount,
+            cleanedEnemyCount);
     }
 
     public async Task<bool> AppendLogIfActiveAsync(

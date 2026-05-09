@@ -11,7 +11,7 @@ public interface ICombatSessionRepository
 
     Task<CombatSessionSummary?> GetActiveCombatSessionAsync(string guildId, string channelId);
 
-    Task<CombatSessionSummary> EndCombatSessionAsync(string guildId, string channelId);
+    Task<CombatSessionEndResult> EndCombatSessionAsync(string guildId, string channelId, string endedByDiscordId);
 
     Task<bool> AppendLogIfActiveAsync(
         string guildId,
